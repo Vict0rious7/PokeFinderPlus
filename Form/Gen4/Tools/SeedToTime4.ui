@@ -86,7 +86,62 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="0" colspan="7">
+          <item row="2" column="3">
+           <widget class="QCheckBox" name="checkBoxDPPtToday">
+            <property name="toolTip">
+             <string>Pick the seed with the most tries left today, without changing the console clock (PokeFinderPlus)</string>
+            </property>
+            <property name="text">
+             <string>Today</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="4">
+           <widget class="QComboBox" name="comboBoxDPPtParity">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string>Delay parity of the picked seed</string>
+            </property>
+            <item>
+             <property name="text">
+              <string>Any</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Even</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Odd</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="3" column="0" colspan="4">
+           <widget class="QPlainTextEdit" name="plainTextEditDPPtSeeds">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>100</height>
+             </size>
+            </property>
+            <property name="placeholderText">
+             <string>Paste seeds, one per line (the first value on each line is used)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="4" colspan="3">
+           <widget class="QLabel" name="labelDPPtToday">
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0" colspan="7">
            <widget class="TableView" name="tableViewDPPtSearch"/>
           </item>
          </layout>
@@ -317,7 +372,62 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="0" colspan="12">
+          <item row="2" column="3">
+           <widget class="QCheckBox" name="checkBoxHGSSToday">
+            <property name="toolTip">
+             <string>Pick the seed with the most tries left today, without changing the console clock (PokeFinderPlus)</string>
+            </property>
+            <property name="text">
+             <string>Today</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="4">
+           <widget class="QComboBox" name="comboBoxHGSSParity">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string>Delay parity of the picked seed</string>
+            </property>
+            <item>
+             <property name="text">
+              <string>Any</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Even</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Odd</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="4" column="0" colspan="6">
+           <widget class="QPlainTextEdit" name="plainTextEditHGSSSeeds">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>100</height>
+             </size>
+            </property>
+            <property name="placeholderText">
+             <string>Paste seeds, one per line (the first value on each line is used)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="6" colspan="6">
+           <widget class="QLabel" name="labelHGSSToday">
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0" colspan="12">
            <widget class="TableView" name="tableViewHGSSSearch"/>
           </item>
          </layout>
@@ -421,6 +531,9 @@
   <tabstop>textBoxDPPtYear</tabstop>
   <tabstop>checkBoxDPPtSecond</tabstop>
   <tabstop>textBoxDPPtSecond</tabstop>
+  <tabstop>checkBoxDPPtToday</tabstop>
+  <tabstop>comboBoxDPPtParity</tabstop>
+  <tabstop>plainTextEditDPPtSeeds</tabstop>
   <tabstop>pushButtonDPPtGenerate</tabstop>
   <tabstop>tableViewDPPtSearch</tabstop>
   <tabstop>textBoxDPPtDelayCalibration</tabstop>
@@ -432,6 +545,9 @@
   <tabstop>textBoxHGSSYear</tabstop>
   <tabstop>checkBoxHGSSSecond</tabstop>
   <tabstop>textBoxHGSSSecond</tabstop>
+  <tabstop>checkBoxHGSSToday</tabstop>
+  <tabstop>comboBoxHGSSParity</tabstop>
+  <tabstop>plainTextEditHGSSSeeds</tabstop>
   <tabstop>pushButtonHGSSMap</tabstop>
   <tabstop>textBoxHGSSPlayerLocation</tabstop>
   <tabstop>checkBoxHGSSRaikou</tabstop>

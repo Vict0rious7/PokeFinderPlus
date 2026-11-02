@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * added tests for the "Today" seed picker.
  */
 
 #ifndef SEEDTOTIMECALCULATOR4TEST_HPP
@@ -28,6 +31,10 @@ class SeedToTimeCalculator4Test : public QObject
 private slots:
     void calculateTimes_data();
     void calculateTimes();
+    void parseSeedList();
+    void calculateTimesToday();
+    void rankToday_data();
+    void rankToday();
 };
 
 #endif // SEEDTOTIMECALCULATOR4TEST_HPP

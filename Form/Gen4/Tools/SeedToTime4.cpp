@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * added the "Today" checkbox (pick the best seed from a pasted list for today, no clock change).
  */
 
 #include "SeedToTime4.hpp"
@@ -27,8 +30,57 @@
 #include <Form/Gen4/Tools/SearchCalls.hpp>
 #include <Form/Gen4/Tools/SearchCoinFlips.hpp>
 #include <Model/Gen4/SeedToTimeModel4.hpp>
+#include <QDateTime>
 #include <QMessageBox>
 #include <QSettings>
+
+// PokeFinderPlus: "Today" seed picker, shared by the DPPt and HGSS tabs
+namespace
+{
+    void todayToggled(bool checked, TextBox *seed, TextBox *year, QCheckBox *second, TextBox *secondBox, QComboBox *parity,
+                      QPlainTextEdit *list, QLabel *label)
+    {
+        seed->setEnabled(!checked);
+        year->setEnabled(!checked);
+        second->setEnabled(!checked);
+        secondBox->setEnabled(!checked && second->isChecked());
+        parity->setEnabled(checked);
+        list->setVisible(checked);
+        label->setVisible(checked);
+    }
+
+    // Picks the best seed for today into the seed box and fills the model with its remaining times. Returns false if none.
+    bool todayGenerate(QPlainTextEdit *list, QComboBox *parity, QLabel *label, TextBox *seedBox, SeedToTimeModel4 *model)
+    {
+        QDateTime current = QDateTime::currentDateTime();
+        QDate d = current.date();
+        QTime t = current.time();
+        DateTime now(d.year(), d.month(), d.day(), t.hour(), t.minute(), t.second());
+
+        u32 rejected;
+        auto seeds = SeedToTimeCalculator4::parseSeedList(list->toPlainText().toStdString(), rejected);
+        auto ranked = SeedToTimeCalculator4::rankToday(seeds, now, parity->currentIndex() - 1);
+
+        QString read
+            = QObject::tr("%1 seeds read, rejected lines: %2, hittable today: %3").arg(seeds.size()).arg(rejected).arg(ranked.size());
+        if (ranked.empty())
+        {
+            label->setText(QObject::tr("No seed can be hit today after %1. %2").arg(t.toString("HH:mm"), read));
+            return false;
+        }
+
+        const auto &best = ranked.front();
+        seedBox->setText(QString::number(best.seed, 16).toUpper().rightJustified(8, '0'));
+        label->setText(QObject::tr("Best: %1, %2 tries, delay %3, %4 to %5. %6")
+                           .arg(seedBox->text())
+                           .arg(best.times.size())
+                           .arg(best.times.front().getDelay())
+                           .arg(QString::fromStdString(best.times.front().getDateTime().getTime().toString()),
+                                QString::fromStdString(best.times.back().getDateTime().getTime().toString()), read));
+        model->addItems(best.times);
+        return true;
+    }
+}
 
 SeedToTime4::SeedToTime4(QWidget *parent) : QWidget(parent), ui(new Ui::SeedToTime4)
 {
@@ -75,6 +127,22 @@ SeedToTime4::SeedToTime4(QWidget *parent) : QWidget(parent), ui(new Ui::SeedToTi
     connect(ui->checkBoxDPPtSecond, &QCheckBox::clicked, ui->textBoxDPPtSecond, &TextBox::setEnabled);
     connect(ui->checkBoxHGSSSecond, &QCheckBox::clicked, ui->textBoxHGSSSecond, &TextBox::setEnabled);
     connect(ui->pushButtonHGSSMap, &QPushButton::clicked, this, &SeedToTime4::map);
+
+    // PokeFinderPlus: Today
+    ui->plainTextEditDPPtSeeds->setVisible(false);
+    ui->labelDPPtToday->setVisible(false);
+    ui->plainTextEditHGSSSeeds->setVisible(false);
+    ui->labelHGSSToday->setVisible(false);
+    connect(ui->checkBoxDPPtToday, &QCheckBox::clicked, this, [this](bool checked) {
+        todayToggled(checked, ui->textBoxDPPtSeed, ui->textBoxDPPtYear, ui->checkBoxDPPtSecond, ui->textBoxDPPtSecond,
+                     ui->comboBoxDPPtParity, ui->plainTextEditDPPtSeeds, ui->labelDPPtToday);
+    });
+    connect(ui->checkBoxHGSSToday, &QCheckBox::clicked, this, [this](bool checked) {
+        todayToggled(checked, ui->textBoxHGSSSeed, ui->textBoxHGSSYear, ui->checkBoxHGSSSecond, ui->textBoxHGSSSecond,
+                     ui->comboBoxHGSSParity, ui->plainTextEditHGSSSeeds, ui->labelHGSSToday);
+    });
+    connect(ui->comboBoxDPPtParity, &QComboBox::currentIndexChanged, this, &SeedToTime4::dpptGenerate);
+    connect(ui->comboBoxHGSSParity, &QComboBox::currentIndexChanged, this, &SeedToTime4::hgssGenerate);
 
     QSettings setting;
     setting.beginGroup("SeedToTime4");
@@ -184,6 +252,16 @@ void SeedToTime4::dpptGenerate()
 
     dpptModel->clearModel();
 
+    // PokeFinderPlus: Today picks the seed from the list and shows its remaining times
+    if (ui->checkBoxDPPtToday->isChecked())
+    {
+        bool found = todayGenerate(ui->plainTextEditDPPtSeeds, ui->comboBoxDPPtParity, ui->labelDPPtToday, ui->textBoxDPPtSeed, dpptModel);
+        ui->labelDPPtCoinFlips->setText(
+            found ? tr("Coin Flips: %1").arg(QString::fromStdString(Utilities4::coinFlips(ui->textBoxDPPtSeed->getUInt())))
+                  : tr("Coin Flips:"));
+        return;
+    }
+
     auto results = SeedToTimeCalculator4::calculateTimes(seed, year, forceSecond, forcedSecond);
     ui->labelDPPtCoinFlips->setText(tr("Coin Flips: %1").arg(QString::fromStdString(Utilities4::coinFlips(seed))));
 
@@ -224,6 +302,15 @@ void SeedToTime4::hgssGenerate()
 {
     hgssModel->clearModel();
 
+    // PokeFinderPlus: Today picks the seed from the list into the seed box and shows its remaining times
+    bool today = ui->checkBoxHGSSToday->isChecked();
+    if (today && !todayGenerate(ui->plainTextEditHGSSSeeds, ui->comboBoxHGSSParity, ui->labelHGSSToday, ui->textBoxHGSSSeed, hgssModel))
+    {
+        ui->labelHGSSElmCalls->setText(tr("Elm Calls:"));
+        ui->labelHGSSRoamers->setText(tr("Roamers:"));
+        return;
+    }
+
     u32 seed = ui->textBoxHGSSSeed->getUInt();
     u16 year = ui->textBoxHGSSYear->getUShort();
 
@@ -241,8 +328,11 @@ void SeedToTime4::hgssGenerate()
     std::string str = roamer.getRouteString();
     ui->labelHGSSRoamers->setText(tr("Roamers: %1").arg(str.empty() ? tr("No roamers") : QString::fromStdString(str)));
 
-    auto results = SeedToTimeCalculator4::calculateTimes(seed, year, forceSecond, forcedSecond);
-    hgssModel->addItems(results);
+    if (!today)
+    {
+        auto results = SeedToTimeCalculator4::calculateTimes(seed, year, forceSecond, forcedSecond);
+        hgssModel->addItems(results);
+    }
 }
 
 void SeedToTime4::map() const
