@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * FRLG initial seed columns (port of Ten Lines) after Seed in the searcher model.
  */
 
 #include "WildModel3.hpp"
@@ -118,7 +121,7 @@ WildSearcherModel3::WildSearcherModel3(QObject *parent) : TableModel(parent), sh
 
 int WildSearcherModel3::columnCount(const QModelIndex &parent) const
 {
-    return 16;
+    return 16 + frlg.count();
 }
 
 QVariant WildSearcherModel3::data(const QModelIndex &index, int role) const
@@ -127,6 +130,15 @@ QVariant WildSearcherModel3::data(const QModelIndex &index, int role) const
     {
         const auto &state = model[index.row()];
         int column = index.column();
+        // PokeFinderPlus: FRLG initial seed columns right after Seed
+        if (column >= 1 && column <= frlg.count())
+        {
+            return frlg.data(state.getSeed(), column - 1);
+        }
+        if (column > frlg.count())
+        {
+            column -= frlg.count();
+        }
         switch (column)
         {
         case 0:
@@ -170,7 +182,12 @@ QVariant WildSearcherModel3::headerData(int section, Qt::Orientation orientation
 {
     if (role == Qt::DisplayRole && orientation == Qt::Horizontal)
     {
-        return header[section];
+        // PokeFinderPlus: FRLG initial seed columns right after Seed
+        if (section >= 1 && section <= frlg.count())
+        {
+            return frlg.header(section - 1);
+        }
+        return header[section > frlg.count() ? section - frlg.count() : section];
     }
     return QVariant();
 }
@@ -178,5 +195,12 @@ QVariant WildSearcherModel3::headerData(int section, Qt::Orientation orientation
 void WildSearcherModel3::setShowStats(bool flag)
 {
     showStats = flag;
-    emit dataChanged(index(0, 7), index(rowCount() - 1, 12), { Qt::DisplayRole });
+    emit dataChanged(index(0, 7 + frlg.count()), index(rowCount() - 1, 12 + frlg.count()), { Qt::DisplayRole });
+}
+
+void WildSearcherModel3::setFRLGSettings(const FRLGSeedSettings &settings)
+{
+    beginResetModel();
+    frlg.setSettings(settings);
+    endResetModel();
 }

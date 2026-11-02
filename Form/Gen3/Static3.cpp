@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * FRLG initial seed options and columns in the searcher (port of Ten Lines).
  */
 
 #include "Static3.hpp"
@@ -29,6 +32,7 @@
 #include <Core/Parents/ProfileLoader.hpp>
 #include <Core/Util/Translator.hpp>
 #include <Form/Controls/Controls.hpp>
+#include <Form/Gen3/FRLGSeedOptions.hpp>
 #include <Form/Gen3/Profile/ProfileManager3.hpp>
 #include <Form/Gen3/Tools/SeedToTime3.hpp>
 #include <Model/Gen3/StaticModel3.hpp>
@@ -52,6 +56,13 @@ Static3::Static3(QWidget *parent) : QWidget(parent), ui(new Ui::Static3)
 
     ui->tableViewGenerator->setModel(generatorModel);
     ui->tableViewSearcher->setModel(proxyModel);
+
+    // PokeFinderPlus: FRLG initial seed options between the progress bar and the results
+    auto *frlgOptions = new FRLGSeedOptions(ui->tabSpreadSearcher);
+    ui->gridLayout_5->removeWidget(ui->tableViewSearcher);
+    ui->gridLayout_5->addWidget(frlgOptions, 2, 0, 1, 3);
+    ui->gridLayout_5->addWidget(ui->tableViewSearcher, 3, 0, 1, 3);
+    connect(frlgOptions, &FRLGSeedOptions::settingsChanged, searcherModel, &StaticSearcherModel3::setFRLGSettings);
 
     ui->textBoxGeneratorSeed->setValues(InputType::Seed32Bit);
     ui->textBoxGeneratorInitialAdvances->setValues(InputType::Advance32Bit);
@@ -167,6 +178,12 @@ void Static3::generatorPokemonIndexChanged(int index)
 void Static3::profileChanged(const Profile3 &profile)
 {
     currentProfile = &profile;
+
+    // PokeFinderPlus: FRLG initial seed options only for FireRed/LeafGreen profiles
+    if (auto *frlgOptions = findChild<FRLGSeedOptions *>())
+    {
+        frlgOptions->setProfile((profile.getVersion() & Game::FRLG) != Game::None, (profile.getVersion() & Game::LeafGreen) != Game::None);
+    }
     if (currentProfile->getDeadBattery())
     {
         ui->textBoxGeneratorSeed->setText("5a0");

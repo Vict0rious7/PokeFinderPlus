@@ -8,6 +8,7 @@ Licensed under GPL-3.0, like PokéFinder (see `LICENSE`). Modified files say so 
 ## What's different from PokéFinder
 
 - **Gen 4 Seed to Time, "Today" checkbox (DPPt and HGSS).** Paste the seeds a searcher returned (one per line; whole copied rows work, the first value is used). Generate picks the seed you can still hit today without changing the console clock: earliest hour first, then the most tries left from the next minute, then the shortest delay. "Any / Even / Odd" restricts the delay parity. The table lists its remaining times; Calibrate works as usual. Uses the computer's clock. Unticked, Seed to Time is unchanged.
+- **Gen 3 Static and Wild searchers, FRLG initial seed columns.** For FireRed/LeafGreen profiles, each result shows the best reachable initial seed, its seed time (ms), advances, total time and settings, with Ten Lines' Teachy TV mode. Pick the game (ENG, SPA/FRE/ITA/GER, JPN, mGBA, Switch), console and settings (or Any) above the results. This is a port of [Ten Lines](https://github.com/Lincoln-LM/ten-lines) by Lincoln-LM (GPL-3.0), with its seed tables: FRLG seeds farmed by blisy, po, HunarPG, 10Ben, Real96, ColdStoneSys, Papa Jefé, and トノ. Refresh the tables with `python3 Core/Resources/FRLG/pull_frlg_seeds.py`.
 - Window title, About box and update check point to this fork.
 
 ---

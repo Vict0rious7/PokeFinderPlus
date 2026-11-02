@@ -136,6 +136,8 @@ set(PROJECT_SOURCES
     Gen3/Eggs3.hpp
     Gen3/IDs3.cpp
     Gen3/IDs3.hpp
+    Gen3/FRLGSeedOptions.cpp
+    Gen3/FRLGSeedOptions.hpp
     Gen3/GameCube.cpp
     Gen3/GameCube.hpp
     Gen3/Profile/ProfileDisplay3.cpp

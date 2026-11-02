@@ -40,6 +40,7 @@ set(EMBED_HEADERS
     ${EMBED_PATH}/EncounterData4.hpp
     ${EMBED_PATH}/EncounterData5.hpp
     ${EMBED_PATH}/EncounterData8.hpp
+    ${EMBED_PATH}/FRLGSeeds.hpp
     ${EMBED_PATH}/i18n.hpp
     ${EMBED_PATH}/Personal.hpp
 )
@@ -103,6 +104,8 @@ add_library(PokeFinderCore STATIC
     Gen3/States/EggState3.hpp
     Gen3/States/PIDToIVState.hpp
     Gen3/States/PokeSpotState.hpp
+    Gen3/Tools/FRLGInitialSeed.cpp
+    Gen3/Tools/FRLGInitialSeed.hpp
     Gen3/Tools/JirachiPattern.cpp
     Gen3/Tools/JirachiPattern.hpp
     Gen3/Tools/PIDToIVCalculator.cpp

@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
- * window title, About box and update check point to the fork.
+ * window title, About box and update check point to the fork; About credits the FRLG seed data.
  */
 
 #include "MainWindow.hpp"
@@ -748,7 +748,11 @@ void MainWindow::openAbout() const
 {
     QStringList info = { tr("PokeFinderPlus: unofficial fork of PokeFinder (github.com/Admiral-Fish/PokeFinder)"),
                          tr("Report bugs to github.com/Vict0rious7/PokeFinderPlus/issues, not to PokeFinder"),
-                         tr("Version: %1").arg(POKEFINDER_VERSION), tr("Branch: %1").arg(GIT_BRANCH), tr("Commit: %1").arg(GIT_COMMIT) };
+                         tr("FRLG initial seeds: port of Ten Lines by Lincoln-LM; seeds farmed by blisy, po, HunarPG, 10Ben, Real96, "
+                            "ColdStoneSys, Papa Jefé, and トノ"),
+                         tr("Version: %1").arg(POKEFINDER_VERSION),
+                         tr("Branch: %1").arg(GIT_BRANCH),
+                         tr("Commit: %1").arg(GIT_COMMIT) };
 
     QMessageBox msg(QMessageBox::Information, tr("About"), info.join('\n'), QMessageBox::Close);
     QAbstractButton *copy = msg.addButton(tr("Copy"), QMessageBox::NoRole);

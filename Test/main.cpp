@@ -23,6 +23,7 @@
 #include <Test/Gen3/GameCubeGeneratorTest.hpp>
 #include <Test/Gen3/GameCubeSearcherTest.hpp>
 #include <Test/Gen3/IDGenerator3Test.hpp>
+#include <Test/Gen3/FRLGInitialSeedTest.hpp> // PokeFinderPlus
 #include <Test/Gen3/JirachiPatternTest.hpp>
 #include <Test/Gen3/PIDToIVCalculatorTest.hpp>
 #include <Test/Gen3/PokeSpotGeneratorTest.hpp>
@@ -94,6 +95,7 @@ int main()
     status += runTest<GameCubeGeneratorTest>(fails);
     status += runTest<GameCubeSearcherTest>(fails);
     status += runTest<IDGenerator3Test>(fails);
+    status += runTest<FRLGInitialSeedTest>(fails); // PokeFinderPlus
     status += runTest<JirachiPatternTest>(fails);
     status += runTest<PIDToIVCalculatorTest>(fails);
     status += runTest<PokeSpotGeneratorTest>(fails);

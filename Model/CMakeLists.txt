@@ -5,6 +5,8 @@ add_library(PokeFinderModel STATIC
     Gen3/IDModel3.hpp
     Gen3/EggModel3.cpp
     Gen3/EggModel3.hpp
+    Gen3/FRLGSeedColumns.cpp
+    Gen3/FRLGSeedColumns.hpp
     Gen3/GameCubeModel.cpp
     Gen3/GameCubeModel.hpp
     Gen3/PIDToIVModel.cpp

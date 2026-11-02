@@ -15,12 +15,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * FRLG initial seed columns (port of Ten Lines) after Seed in the searcher model.
  */
 
 #ifndef STATIC3MODEL_HPP
 #define STATIC3MODEL_HPP
 
 #include <Core/Parents/States/State.hpp>
+#include <Model/Gen3/FRLGSeedColumns.hpp>
 #include <Model/TableModel.hpp>
 
 /**
@@ -127,6 +131,11 @@ public:
 
 public slots:
     /**
+     * @brief PokeFinderPlus: sets the FRLG initial seed columns
+     */
+    void setFRLGSettings(const FRLGSeedSettings &settings);
+
+    /**
      * @brief Sets flag that controls whether the model display stats or IVs
      *
      * @param flag Whether to show stats or not
@@ -134,6 +143,7 @@ public slots:
     void setShowStats(bool flag);
 
 private:
+    FRLGSeedColumns frlg; // PokeFinderPlus
     QStringList header = { tr("Seed"), tr("PID"), tr("Shiny"), tr("Nature"), tr("Ability"), tr("HP"),    tr("Atk"),
                            tr("Def"),  tr("SpA"), tr("SpD"),   tr("Spe"),    tr("Hidden"),  tr("Power"), tr("Gender") };
     bool showStats;
