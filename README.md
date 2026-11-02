@@ -1,3 +1,17 @@
+# PokéFinderPlus
+
+**Unofficial fork of [PokéFinder](https://github.com/Admiral-Fish/PokeFinder)** by Admiral-Fish and contributors, maintained by Vict0rious7.
+It is not supported by the PokéFinder team: **report bugs in this fork to [Vict0rious7/PokeFinderPlus issues](https://github.com/Vict0rious7/PokeFinderPlus/issues)**, not to PokéFinder or its Discord.
+
+Licensed under GPL-3.0, like PokéFinder (see `LICENSE`). Modified files say so in their header.
+
+## What's different from PokéFinder
+
+- **Gen 4 Seed to Time, "Today" checkbox (DPPt and HGSS).** Paste the seeds a searcher returned (one per line; whole copied rows work, the first value is used). Generate picks the seed you can still hit today without changing the console clock: earliest hour first, then the most tries left from the next minute, then the shortest delay. "Any / Even / Odd" restricts the delay parity. The table lists its remaining times; Calibrate works as usual. Uses the computer's clock. Unticked, Seed to Time is unchanged.
+- Window title, About box and update check point to this fork.
+
+---
+
 # PokéFinder
 
 Join the PokéFinder Discord server to talk about development and contribute.

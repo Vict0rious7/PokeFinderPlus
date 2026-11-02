@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * window title, About box and update check point to the fork.
  */
 
 #include "MainWindow.hpp"
@@ -81,7 +84,7 @@
 MainWindow::MainWindow(bool profile, QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    setWindowTitle(QString("Pok\303\251Finder %1").arg(POKEFINDER_VERSION));
+    setWindowTitle(QString("Pok\303\251FinderPlus %1 (unofficial fork of Pok\303\251Finder)").arg(POKEFINDER_VERSION));
 
     connect(ui->pushButtonEgg3, &QPushButton::clicked, this, &MainWindow::openEgg3);
     connect(ui->pushButtonGameCube, &QPushButton::clicked, this, &MainWindow::openGameCube);
@@ -199,7 +202,8 @@ void MainWindow::checkUpdates() const
 
     if (lastOpened.daysTo(today) > 0)
     {
-        auto json = QJsonDocument::fromJson(downloadFile("https://api.github.com/repos/Admiral-Fish/PokeFinder/releases/latest")).object();
+        auto json
+            = QJsonDocument::fromJson(downloadFile("https://api.github.com/repos/Vict0rious7/PokeFinderPlus/releases/latest")).object();
         QString webVersion = json["tag_name"].toString().right(5);
         if (!webVersion.isEmpty() && POKEFINDER_VERSION != webVersion)
         {
@@ -208,7 +212,7 @@ void MainWindow::checkUpdates() const
                             QMessageBox::Yes | QMessageBox::No);
             if (msg.exec() == QMessageBox::Yes)
             {
-                QDesktopServices::openUrl(QUrl("https://github.com/Admiral-Fish/PokeFinder/releases/latest"));
+                QDesktopServices::openUrl(QUrl("https://github.com/Vict0rious7/PokeFinderPlus/releases/latest"));
             }
         }
     }
@@ -742,7 +746,9 @@ void MainWindow::openWild8()
 
 void MainWindow::openAbout() const
 {
-    QStringList info = { tr("Version: %1").arg(POKEFINDER_VERSION), tr("Branch: %1").arg(GIT_BRANCH), tr("Commit: %1").arg(GIT_COMMIT) };
+    QStringList info = { tr("PokeFinderPlus: unofficial fork of PokeFinder (github.com/Admiral-Fish/PokeFinder)"),
+                         tr("Report bugs to github.com/Vict0rious7/PokeFinderPlus/issues, not to PokeFinder"),
+                         tr("Version: %1").arg(POKEFINDER_VERSION), tr("Branch: %1").arg(GIT_BRANCH), tr("Commit: %1").arg(GIT_COMMIT) };
 
     QMessageBox msg(QMessageBox::Information, tr("About"), info.join('\n'), QMessageBox::Close);
     QAbstractButton *copy = msg.addButton(tr("Copy"), QMessageBox::NoRole);
