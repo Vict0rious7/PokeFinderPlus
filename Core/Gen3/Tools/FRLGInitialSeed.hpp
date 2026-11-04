@@ -40,6 +40,15 @@ struct FRLGInitialSeedResult
 };
 
 /**
+ * @brief A farmed initial seed and its Ten Lines seed time (16 x frame of the title screen press)
+ */
+struct FRLGSeedTime
+{
+    u16 initialSeed;
+    u32 seedTime;
+};
+
+/**
  * @brief Settings filter. An empty string means "Any".
  */
 struct FRLGSettingsFilter
@@ -86,6 +95,21 @@ namespace FRLGInitialSeed
      */
     std::vector<FRLGInitialSeedResult> find(u32 target, u16 count, u32 offset, const std::string &gameVersion, u32 ttvFramesOut,
                                             const FRLGSettingsFilter &filter);
+
+    /**
+     * @brief Ten Lines' get_contiguous_seed_list: farmed seeds of one setting in frame order
+     *
+     * @param gameVersion Ten Lines game version key
+     * @param settings Full Ten Lines settings key, e.g. mono_a_a_none or mono_a_start_startup_select
+     */
+    std::vector<FRLGSeedTime> contiguousSeeds(const std::string &gameVersion, const std::string &settings);
+
+    /**
+     * @brief Ten Lines' calibration seed list: \p seed and up to \p leeway seeds before and after it in the farmed order
+     *
+     * @return Empty if \p seed is not in the list for these settings
+     */
+    std::vector<FRLGSeedTime> neighbourSeeds(const std::string &gameVersion, const std::string &settings, u16 seed, u32 leeway);
 
     /**
      * @brief Ten Lines' frameToMS: floor(frame / frame rate x 1000) + console offset

@@ -93,3 +93,28 @@ void FRLGInitialSeedTest::humanize()
              std::string("Mono | L=A | Seed Button: Start | Extra Button: Startup Select"));
     QCOMPARE(FRLGInitialSeed::humanizeSettings("stereo_h_a_none"), std::string("Stereo | Help | Seed Button: A | Extra Button: None "));
 }
+
+// Ten Lines' calibration list (get_contiguous_seed_list), expected values from the Python reader of the same table
+void FRLGInitialSeedTest::neighbourSeeds()
+{
+    auto none = FRLGInitialSeed::neighbourSeeds("fr", "mono_a_a_none", 0x16B3, 2);
+    std::vector<std::pair<u16, u32>> expected
+        = { { 0xAB93, 35024 }, { 0xC915, 35040 }, { 0x16B3, 35056 }, { 0x6071, 35072 }, { 0xA8CE, 35088 } };
+    QCOMPARE(none.size(), expected.size());
+    for (size_t i = 0; i < none.size(); i++)
+    {
+        QCOMPARE(none[i].initialSeed, expected[i].first);
+        QCOMPARE(none[i].seedTime, expected[i].second);
+    }
+
+    // Startup Select shifts every seed by Ten Lines' offset (-1 in L=A mode)
+    auto select = FRLGInitialSeed::neighbourSeeds("fr", "mono_a_a_startup_select", 0x16B2, 2);
+    QCOMPARE(select.size(), 5);
+    QCOMPARE(select[0].initialSeed, u16(0xAB92));
+    QCOMPARE(select[2].seedTime, 35056u);
+
+    // Start of the list: fewer seeds before; unknown seed or settings: empty
+    QCOMPARE(FRLGInitialSeed::neighbourSeeds("fr", "mono_a_a_none", 0x11AC, 2).size(), 3);
+    QVERIFY(FRLGInitialSeed::neighbourSeeds("fr", "mono_a_a_none", 0x16B2, 2).empty());
+    QVERIFY(FRLGInitialSeed::neighbourSeeds("fr", "mono_a", 0x16B3, 2).empty());
+}

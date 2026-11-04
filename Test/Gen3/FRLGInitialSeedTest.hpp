@@ -33,6 +33,7 @@ private slots:
     void filterExcludesEverything();
     void teachyTV();
     void humanize();
+    void neighbourSeeds();
 };
 
 #endif // FRLGINITIALSEEDTEST_HPP

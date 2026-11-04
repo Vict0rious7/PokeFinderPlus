@@ -40,8 +40,12 @@ QVariant FRLGSeedColumns::header(int column) const
     return column < headers.size() ? headers[column] : QVariant();
 }
 
-QVariant FRLGSeedColumns::data(u32 seed, int column) const
+std::optional<FRLGInitialSeedResult> FRLGSeedColumns::result(u32 seed) const
 {
+    if (!settings.enabled)
+    {
+        return std::nullopt;
+    }
     auto it = cache.find(seed);
     if (it == cache.end())
     {
@@ -49,18 +53,24 @@ QVariant FRLGSeedColumns::data(u32 seed, int column) const
             = FRLGInitialSeed::find(seed, 1, 0, settings.gameVersion, settings.teachyTV ? settings.regularOut : 0, settings.filter);
         it = cache.emplace(seed, results.empty() ? std::nullopt : std::optional(results.front())).first;
     }
-    if (!it->second)
+    return it->second;
+}
+
+QVariant FRLGSeedColumns::data(u32 seed, int column) const
+{
+    auto found = result(seed);
+    if (!found)
     {
         return QString("-");
     }
 
-    const auto &result = *it->second;
-    u32 visualFrame = result.advances;
+    const auto &best = *found;
+    u32 visualFrame = best.advances;
     u32 ttvAdvances = 0;
     if (settings.teachyTV)
     {
         u32 regular;
-        FRLGInitialSeed::teachyTVConversion(result.advances, settings.regularOut, ttvAdvances, regular);
+        FRLGInitialSeed::teachyTVConversion(best.advances, settings.regularOut, ttvAdvances, regular);
         visualFrame = ttvAdvances + regular;
     }
 
@@ -71,18 +81,18 @@ QVariant FRLGSeedColumns::data(u32 seed, int column) const
     switch (column)
     {
     case 0:
-        return QString::number(result.initialSeed, 16).toUpper().rightJustified(4, '0');
+        return QString::number(best.initialSeed, 16).toUpper().rightJustified(4, '0');
     case 1:
-        return FRLGInitialSeed::frameToMS(result.seedTime / 16.0, settings.console);
+        return FRLGInitialSeed::frameToMS(best.seedTime / 16.0, settings.console);
     case 2:
-        return result.advances;
+        return best.advances;
     case 3:
         return visualFrame;
     case 4:
         return ttvAdvances;
     case 5:
     {
-        qint64 ms = FRLGInitialSeed::frameToMS(result.seedTime / 16.0 + visualFrame, settings.console);
+        qint64 ms = FRLGInitialSeed::frameToMS(best.seedTime / 16.0 + visualFrame, settings.console);
         qint64 h = ms / 3600000, m = ms / 60000 % 60, s = ms / 1000 % 60, z = ms % 1000;
         return QString("%1:%2:%3.%4")
             .arg(h, 2, 10, QChar('0'))
@@ -91,7 +101,7 @@ QVariant FRLGSeedColumns::data(u32 seed, int column) const
             .arg(z, 3, 10, QChar('0'));
     }
     case 6:
-        return QString::fromStdString(FRLGInitialSeed::humanizeSettings(result.settings));
+        return QString::fromStdString(FRLGInitialSeed::humanizeSettings(best.settings));
     default:
         return QVariant();
     }
@@ -101,4 +111,46 @@ void FRLGSeedColumns::setSettings(const FRLGSeedSettings &settings)
 {
     this->settings = settings;
     cache.clear();
+}
+
+QString methodName(Method method, bool wild)
+{
+    switch (method)
+    {
+    case Method::Method1:
+        return wild ? QObject::tr("Wild 1") : QObject::tr("Method 1");
+    case Method::Method2:
+        return wild ? QObject::tr("Wild 2") : QObject::tr("Method 2");
+    case Method::Method4:
+        return wild ? QObject::tr("Wild 4") : QObject::tr("Method 4");
+    default:
+        return QString("-");
+    }
+}
+
+int GeneratorExtraColumns::count() const
+{
+    return (seed ? 2 : 0) + (method ? 1 : 0);
+}
+
+QVariant GeneratorExtraColumns::header(int column) const
+{
+    if (seed && column < 2)
+    {
+        return column == 0 ? QObject::tr("Initial Seed") : QObject::tr("Seed Time (ms)");
+    }
+    return QObject::tr("Method");
+}
+
+QVariant GeneratorExtraColumns::data(const RowExtra &extra, int column) const
+{
+    if (seed && column == 0)
+    {
+        return extra.initialSeed < 0 ? QVariant("-") : QVariant(QString::number(extra.initialSeed, 16).toUpper().rightJustified(4, '0'));
+    }
+    if (seed && column == 1)
+    {
+        return extra.seedTimeMs < 0 ? QVariant("-") : QVariant(extra.seedTimeMs);
+    }
+    return methodName(extra.method, wild);
 }

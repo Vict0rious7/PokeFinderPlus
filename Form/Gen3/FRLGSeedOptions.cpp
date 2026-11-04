@@ -23,6 +23,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QSettings>
 #include <QSpinBox>
@@ -60,7 +61,7 @@ namespace
     }
 }
 
-FRLGSeedOptions::FRLGSeedOptions(QWidget *parent) : QGroupBox(tr("FRLG initial seed (Ten Lines data)"), parent)
+FRLGSeedOptions::FRLGSeedOptions(QWidget *parent) : QGroupBox(parent)
 {
     game = new QComboBox(this);
     for (const auto &[text, key] : GAMES)
@@ -87,13 +88,6 @@ FRLGSeedOptions::FRLGSeedOptions(QWidget *parent) : QGroupBox(tr("FRLG initial s
     regularOut->setEnabled(false);
     regularOut->setToolTip(tr("Teachy TV mode: minimum regular frames (Ten Lines default 3600)"));
 
-    status = new QLabel(this);
-    status->setWordWrap(true);
-    QString stamp = QString::fromStdString(FRLGInitialSeed::dataTimestamp());
-    status->setText(tr("Best reachable initial seed per result, as in Ten Lines (github.com/Lincoln-LM/ten-lines). FRLG seeds farmed by "
-                       "blisy, po, HunarPG, 10Ben, Real96, ColdStoneSys, Papa Jefé, and トノ.%1")
-                        .arg(stamp.isEmpty() ? QString() : tr(" Data as of %1.").arg(stamp)));
-
     auto *layout = new QGridLayout(this);
     QStringList labels = { tr("Game"), tr("Console"), tr("Sound"), tr("Button Mode"), tr("Seed Button"), tr("Extra Button") };
     QList<QWidget *> widgets = { game, console, sound, buttonMode, button, held };
@@ -104,13 +98,13 @@ FRLGSeedOptions::FRLGSeedOptions(QWidget *parent) : QGroupBox(tr("FRLG initial s
     }
     layout->addWidget(teachyTV, 0, labels.size());
     layout->addWidget(regularOut, 1, labels.size());
-    layout->addWidget(status, 2, 0, 1, labels.size() + 1);
 
     QSettings setting;
     setting.beginGroup("frlgSeedOptions");
-    if (setting.contains("game"))
+    savedGame = setting.value("game").toString();
+    if (!savedGame.isEmpty())
     {
-        game->setCurrentIndex(std::max(0, game->findData(setting.value("game"))));
+        game->setCurrentIndex(std::max(0, game->findData(savedGame)));
     }
     gameChanged();
     console->setCurrentIndex(std::max(0, console->findData(setting.value("console", "GBA"))));
@@ -139,7 +133,10 @@ FRLGSeedOptions::~FRLGSeedOptions()
 {
     QSettings setting;
     setting.beginGroup("frlgSeedOptions");
-    setting.setValue("game", game->currentData());
+    if (frlg)
+    {
+        setting.setValue("game", game->currentData());
+    }
     setting.setValue("console", console->currentData());
     setting.setValue("sound", sound->currentData());
     setting.setValue("buttonMode", buttonMode->currentData());
@@ -153,21 +150,25 @@ FRLGSeedOptions::~FRLGSeedOptions()
 void FRLGSeedOptions::setProfile(bool frlg, bool leafGreen)
 {
     this->frlg = frlg;
-    QSettings setting;
-    if (frlg && !setting.contains("frlgSeedOptions/game"))
+    if (frlg)
     {
-        game->setCurrentIndex(game->findData(leafGreen ? "lg" : "fr"));
-    }
-    else if (frlg)
-    {
-        // keep the chosen language/console, but follow the profile's game
-        QString key = game->currentData().toString();
-        QString wanted = (leafGreen ? "lg" : "fr") + key.mid(2);
-        int index = game->findData(wanted);
-        if (index != -1 && wanted != key)
+        // Only the profile's game, keeping the chosen language/console (fr_eu -> lg_eu)
+        QString key = game->count() > 0 ? game->currentData().toString() : savedGame;
+        QString prefix = leafGreen ? "lg" : "fr";
+        QString wanted = key.isEmpty() ? prefix : prefix + key.mid(2);
+
+        game->blockSignals(true);
+        game->clear();
+        for (const auto &[text, entry] : GAMES)
         {
-            game->setCurrentIndex(index);
+            if (entry.starts_with(prefix.toStdString()))
+            {
+                game->addItem(text, QString::fromStdString(entry));
+            }
         }
+        game->setCurrentIndex(std::max(0, game->findData(wanted)));
+        game->blockSignals(false);
+        gameChanged();
     }
     setVisible(frlg);
     update();
@@ -183,6 +184,30 @@ FRLGSeedSettings FRLGSeedOptions::getSettings() const
     settings.teachyTV = teachyTV->isChecked();
     settings.regularOut = regularOut->value();
     return settings;
+}
+
+void FRLGSeedOptions::setSettingsKey(const std::string &settings)
+{
+    // Ten Lines' key: sound_mode_button_held (held may contain an underscore, e.g. startup_select)
+    QStringList parts = QString::fromStdString(settings).split('_');
+    if (parts.size() < 4)
+    {
+        return;
+    }
+    QString heldButton = parts.mid(3).join('_');
+    for (auto *box : { sound, buttonMode, button, held })
+    {
+        box->blockSignals(true);
+    }
+    sound->setCurrentIndex(std::max(0, sound->findData(parts[0])));
+    buttonMode->setCurrentIndex(std::max(0, buttonMode->findData(parts[1])));
+    button->setCurrentIndex(std::max(0, button->findData(parts[2])));
+    held->setCurrentIndex(std::max(0, held->findData(heldButton)));
+    for (auto *box : { sound, buttonMode, button, held })
+    {
+        box->blockSignals(false);
+    }
+    update();
 }
 
 void FRLGSeedOptions::gameChanged()
@@ -211,13 +236,102 @@ void FRLGSeedOptions::gameChanged()
 
 void FRLGSeedOptions::update()
 {
+    // Credits for the farmed seeds are in About and the README
+    QString stamp = QString::fromStdString(FRLGInitialSeed::dataTimestamp());
     if (frlg && !FRLGInitialSeed::hasData(value(game)))
     {
-        setTitle(tr("FRLG initial seed (Ten Lines data): no seed data bundled for this game"));
+        setTitle(tr("FRLG initial seed: no Ten Lines data for this game"));
     }
     else
     {
-        setTitle(tr("FRLG initial seed (Ten Lines data)"));
+        setTitle(stamp.isEmpty() ? tr("FRLG initial seed (Ten Lines data)") : tr("FRLG initial seed (Ten Lines data, %1)").arg(stamp));
     }
     emit settingsChanged(getSettings());
+}
+
+std::string FRLGSeedOptions::settingsKey() const
+{
+    std::string parts[] = { value(sound), value(buttonMode), value(button), value(held) };
+    for (const auto &part : parts)
+    {
+        if (part.empty())
+        {
+            return { };
+        }
+    }
+    return parts[0] + "_" + parts[1] + "_" + parts[2] + "_" + parts[3];
+}
+
+std::vector<CalibrationSeed> FRLGSeedOptions::calibrationSeeds(u32 seed, u32 leeway, QString &note) const
+{
+    note.clear();
+    auto settings = getSettings();
+    std::vector<CalibrationSeed> seeds;
+    if (!settings.enabled)
+    {
+        return { CalibrationSeed { seed, RowExtra() } };
+    }
+
+    std::string key = settingsKey();
+    if (key.empty())
+    {
+        note = tr("Seed ± needs Sound, Button Mode, Seed Button and Extra Button set (not Any). Generated from the seed alone.");
+    }
+    else if (seed > 0xFFFF)
+    {
+        note = tr("FRLG initial seeds are 4 hex digits. Generated from the seed alone.");
+    }
+    else
+    {
+        for (const auto &entry : FRLGInitialSeed::neighbourSeeds(settings.gameVersion, key, static_cast<u16>(seed), leeway))
+        {
+            seeds.emplace_back(CalibrationSeed {
+                entry.initialSeed,
+                RowExtra { Method::None, entry.initialSeed, FRLGInitialSeed::frameToMS(entry.seedTime / 16.0, settings.console) } });
+        }
+        if (seeds.empty())
+        {
+            note = tr("Seed %1 isn't in the farmed list for these settings. Generated from the seed alone.")
+                       .arg(QString::number(seed, 16).toUpper().rightJustified(4, '0'));
+        }
+    }
+
+    if (seeds.empty())
+    {
+        seeds.emplace_back(CalibrationSeed { seed, RowExtra { Method::None, static_cast<int>(seed & 0xFFFF), -1 } });
+    }
+    return seeds;
+}
+
+QSpinBox *FRLGSeedOptions::addSeedLeeway(QGridLayout *grid, QWidget *seedBox)
+{
+    int row, column, rowSpan, columnSpan;
+    grid->getItemPosition(grid->indexOf(seedBox), &row, &column, &rowSpan, &columnSpan);
+    grid->removeWidget(seedBox);
+
+    auto *container = new QWidget(seedBox->parentWidget());
+    auto *layout = new QHBoxLayout(container);
+    layout->setContentsMargins(0, 0, 0, 0);
+    auto *label = new QLabel(tr("Seed ±"), container);
+    auto *leeway = new QSpinBox(container);
+    leeway->setRange(0, 10000);
+    leeway->setToolTip(tr("FRLG: also generate from this many seeds before and after it in the farmed list (Ten Lines' Seed +/-)"));
+    QSettings setting;
+    leeway->setValue(setting.value("frlgSeedOptions/seedLeeway", 20).toInt());
+    connect(leeway, &QSpinBox::valueChanged, leeway, [](int value) {
+        QSettings setting;
+        setting.setValue("frlgSeedOptions/seedLeeway", value);
+    });
+    layout->addWidget(seedBox, 1);
+    layout->addWidget(label);
+    layout->addWidget(leeway);
+    grid->addWidget(container, row, column, rowSpan, columnSpan);
+
+    label->setVisible(frlg);
+    leeway->setVisible(frlg);
+    connect(this, &FRLGSeedOptions::settingsChanged, label, [this, label, leeway] {
+        label->setVisible(frlg);
+        leeway->setVisible(frlg);
+    });
+    return leeway;
 }

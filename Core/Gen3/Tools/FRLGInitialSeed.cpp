@@ -251,6 +251,7 @@ namespace
     {
         std::vector<std::string> keys;
         std::map<u16, std::vector<FRLGSeedEntry>> seed_map;
+        std::map<std::string, std::vector<FRLGSeedEntry>> contiguous_seeds;
 
         FRLGSeedDataStore(const std::vector<u8> &data, bool is_nx_format)
         {
@@ -323,6 +324,7 @@ namespace
                     u32 seed_time
                         = is_nx_format ? static_cast<u32>(seed_times[i]) + 5737 : (block.starting_frame + i / block.frame_size) * 16;
                     seed_map[seed].emplace_back(FRLGSeedEntry { key, button_mode, seed_time, seed });
+                    contiguous_seeds[*key].emplace_back(FRLGSeedEntry { key, button_mode, seed_time, seed });
                 }
             }
         }
@@ -499,6 +501,57 @@ namespace FRLGInitialSeed
             }
         }
         return results;
+    }
+
+    std::vector<FRLGSeedTime> contiguousSeeds(const std::string &gameVersion, const std::string &settings)
+    {
+        // Ten Lines' get_contiguous_seed_list: the farmed seeds of one setting in frame order, shifted by the extra button's offset
+        std::vector<FRLGSeedTime> entries;
+        const auto *seed_store = store(gameVersion);
+        auto offsets = HELD_BUTTON_OFFSETS.find(gameVersion);
+        size_t first = settings.find('_');
+        size_t second = first == std::string::npos ? first : settings.find('_', first + 1);
+        size_t third = second == std::string::npos ? second : settings.find('_', second + 1);
+        if (seed_store == nullptr || offsets == HELD_BUTTON_OFFSETS.end() || third == std::string::npos)
+        {
+            return entries;
+        }
+        std::string setting_key = settings.substr(0, third);
+        std::string held_button = settings.substr(third + 1);
+        char button_mode = settings[first + 1];
+
+        auto seeds_iter = seed_store->contiguous_seeds.find(setting_key);
+        if (seeds_iter == seed_store->contiguous_seeds.end())
+        {
+            return entries;
+        }
+        auto held_button_offset = std::find_if(offsets->second.begin(), offsets->second.end(), [&](const HeldButtonOffset &offset) {
+            return offset.held_button == held_button && offset.button_mode == button_mode;
+        });
+        if (held_button_offset == offsets->second.end())
+        {
+            return entries;
+        }
+        for (const auto &seed : seeds_iter->second)
+        {
+            entries.emplace_back(FRLGSeedTime { static_cast<u16>(seed.initialSeed + held_button_offset->offset), seed.seedTime });
+        }
+        return entries;
+    }
+
+    std::vector<FRLGSeedTime> neighbourSeeds(const std::string &gameVersion, const std::string &settings, u16 seed, u32 leeway)
+    {
+        // Ten Lines' calibration: the target seed and up to leeway seeds before and after it in the farmed order
+        auto list = contiguousSeeds(gameVersion, settings);
+        auto it = std::find_if(list.begin(), list.end(), [seed](const FRLGSeedTime &entry) { return entry.initialSeed == seed; });
+        if (it == list.end())
+        {
+            return { };
+        }
+        size_t index = std::distance(list.begin(), it);
+        size_t start = index > leeway ? index - leeway : 0;
+        size_t end = std::min(list.size(), index + leeway + 1);
+        return std::vector<FRLGSeedTime>(list.begin() + start, list.begin() + end);
     }
 
     int frameToMS(double frame, const std::string &console)

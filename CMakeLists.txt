@@ -49,6 +49,7 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/pokefinder.icns PROPERTI
 
 set_target_properties(PokeFinder PROPERTIES 
     MACOSX_BUNDLE_ICON_FILE pokefinder.icns
+    MACOSX_BUNDLE_BUNDLE_NAME PokeFinderPlus # PokeFinderPlus: name in the macOS menu bar (settings keep the PokeFinder name)
 )
 
 target_link_libraries(PokeFinder PRIVATE PokeFinderCore PokeFinderForm Qt6::Core Qt6::Widgets Threads::Threads)

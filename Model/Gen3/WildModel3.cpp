@@ -31,7 +31,7 @@ WildGeneratorModel3::WildGeneratorModel3(QObject *parent) : TableModel(parent), 
 
 int WildGeneratorModel3::columnCount(const QModelIndex &parent) const
 {
-    return 16;
+    return 16 + extraColumns.count();
 }
 
 QVariant WildGeneratorModel3::data(const QModelIndex &index, int role) const
@@ -56,6 +56,15 @@ QVariant WildGeneratorModel3::data(const QModelIndex &index, int role) const
     else if (role == Qt::DisplayRole)
     {
         int column = index.column();
+        // PokeFinderPlus: Initial Seed, Seed Time and Method right after Advances
+        if (column >= 1 && column <= extraColumns.count())
+        {
+            return extraColumns.data(index.row() < static_cast<int>(extras.size()) ? extras[index.row()] : RowExtra(), column - 1);
+        }
+        if (column > extraColumns.count())
+        {
+            column -= extraColumns.count();
+        }
         if (!state.isValid() && column > 0)
         {
             return "-";
@@ -104,7 +113,12 @@ QVariant WildGeneratorModel3::headerData(int section, Qt::Orientation orientatio
 {
     if (role == Qt::DisplayRole && orientation == Qt::Horizontal)
     {
-        return header[section];
+        // PokeFinderPlus: Initial Seed, Seed Time and Method right after Advances
+        if (section >= 1 && section <= extraColumns.count())
+        {
+            return extraColumns.header(section - 1);
+        }
+        return header[section > extraColumns.count() ? section - extraColumns.count() : section];
     }
     return QVariant();
 }
@@ -112,7 +126,7 @@ QVariant WildGeneratorModel3::headerData(int section, Qt::Orientation orientatio
 void WildGeneratorModel3::setShowStats(bool flag)
 {
     showStats = flag;
-    emit dataChanged(index(0, 7), index(rowCount() - 1, 12), { Qt::DisplayRole });
+    emit dataChanged(index(0, 7 + extraColumns.count()), index(rowCount() - 1, 12 + extraColumns.count()), { Qt::DisplayRole });
 }
 
 WildSearcherModel3::WildSearcherModel3(QObject *parent) : TableModel(parent), showStats(false)
@@ -121,7 +135,7 @@ WildSearcherModel3::WildSearcherModel3(QObject *parent) : TableModel(parent), sh
 
 int WildSearcherModel3::columnCount(const QModelIndex &parent) const
 {
-    return 16 + frlg.count();
+    return 16 + frlg.count() + (showMethod ? 1 : 0);
 }
 
 QVariant WildSearcherModel3::data(const QModelIndex &index, int role) const
@@ -130,14 +144,18 @@ QVariant WildSearcherModel3::data(const QModelIndex &index, int role) const
     {
         const auto &state = model[index.row()];
         int column = index.column();
-        // PokeFinderPlus: FRLG initial seed columns right after Seed
+        // PokeFinderPlus: FRLG initial seed columns, then Method, right after Seed
         if (column >= 1 && column <= frlg.count())
         {
             return frlg.data(state.getSeed(), column - 1);
         }
+        if (showMethod && column == frlg.count() + 1)
+        {
+            return methodName(index.row() < static_cast<int>(methods.size()) ? methods[index.row()] : Method::None, true);
+        }
         if (column > frlg.count())
         {
-            column -= frlg.count();
+            column -= frlg.count() + (showMethod ? 1 : 0);
         }
         switch (column)
         {
@@ -187,7 +205,11 @@ QVariant WildSearcherModel3::headerData(int section, Qt::Orientation orientation
         {
             return frlg.header(section - 1);
         }
-        return header[section > frlg.count() ? section - frlg.count() : section];
+        if (showMethod && section == frlg.count() + 1)
+        {
+            return tr("Method");
+        }
+        return header[section > frlg.count() ? section - frlg.count() - (showMethod ? 1 : 0) : section];
     }
     return QVariant();
 }
@@ -195,7 +217,8 @@ QVariant WildSearcherModel3::headerData(int section, Qt::Orientation orientation
 void WildSearcherModel3::setShowStats(bool flag)
 {
     showStats = flag;
-    emit dataChanged(index(0, 7 + frlg.count()), index(rowCount() - 1, 12 + frlg.count()), { Qt::DisplayRole });
+    emit dataChanged(index(0, 7 + frlg.count() + (showMethod ? 1 : 0)), index(rowCount() - 1, 12 + frlg.count() + (showMethod ? 1 : 0)),
+                     { Qt::DisplayRole });
 }
 
 void WildSearcherModel3::setFRLGSettings(const FRLGSeedSettings &settings)
@@ -203,4 +226,57 @@ void WildSearcherModel3::setFRLGSettings(const FRLGSeedSettings &settings)
     beginResetModel();
     frlg.setSettings(settings);
     endResetModel();
+}
+
+void WildSearcherModel3::addItems(const std::vector<WildSearcherState> &states, Method method)
+{
+    methods.insert(methods.end(), states.size(), method);
+    TableModel<WildSearcherState>::addItems(states);
+}
+
+void WildSearcherModel3::clearModel()
+{
+    methods.clear();
+    TableModel<WildSearcherState>::clearModel();
+}
+
+Method WildSearcherModel3::getMethod(int row) const
+{
+    return row < static_cast<int>(methods.size()) ? methods[row] : Method::None;
+}
+
+void WildSearcherModel3::setShowMethod(bool flag)
+{
+    beginResetModel();
+    showMethod = flag;
+    endResetModel();
+}
+
+std::optional<FRLGInitialSeedResult> WildSearcherModel3::getFRLGResult(int row) const
+{
+    return frlg.result(model[row].getSeed());
+}
+
+void WildGeneratorModel3::addItems(const std::vector<WildGeneratorState> &states, const RowExtra &extra)
+{
+    extras.insert(extras.end(), states.size(), extra);
+    TableModel<WildGeneratorState>::addItems(states);
+}
+
+void WildGeneratorModel3::clearModel()
+{
+    extras.clear();
+    TableModel<WildGeneratorState>::clearModel();
+}
+
+void WildGeneratorModel3::setExtraColumns(bool seed, bool method)
+{
+    if (extraColumns.seed != seed || extraColumns.method != method)
+    {
+        beginResetModel();
+        extraColumns.seed = seed;
+        extraColumns.method = method;
+        extraColumns.wild = true;
+        endResetModel();
+    }
 }

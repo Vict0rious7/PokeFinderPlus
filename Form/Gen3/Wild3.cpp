@@ -17,7 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
- * FRLG initial seed options and columns in the searcher (port of Ten Lines).
+ * FRLG initial seed options and columns in the searcher (port of Ten Lines); Generator Seed ± (Ten Lines' calibration);
+ * "All methods" in the Generator and the Searcher; searcher action "Calibrate in Generator".
  */
 
 #include "Wild3.hpp"
@@ -41,7 +42,10 @@
 #include <Model/Gen3/WildModel3.hpp>
 #include <Model/SortFilterProxyModel.hpp>
 #include <QAction>
+#include <QListView>
+#include <QMessageBox>
 #include <QSettings>
+#include <QSpinBox>
 #include <QTimer>
 
 static const QString settingPrefix = QStringLiteral("wild3");
@@ -60,12 +64,11 @@ Wild3::Wild3(QWidget *parent) : QWidget(parent), ui(new Ui::Wild3)
     ui->tableViewGenerator->setModel(generatorModel);
     ui->tableViewSearcher->setModel(proxyModel);
 
-    // PokeFinderPlus: FRLG initial seed options between the progress bar and the results
-    auto *frlgOptions = new FRLGSeedOptions(ui->tabSpreadSearcher);
-    ui->gridLayout_5->removeWidget(ui->tableViewSearcher);
-    ui->gridLayout_5->addWidget(frlgOptions, 2, 0, 1, 3);
-    ui->gridLayout_5->addWidget(ui->tableViewSearcher, 3, 0, 1, 3);
+    // PokeFinderPlus: FRLG options above the tabs (Generator and Searcher), Seed ± next to the Generator seed
+    auto *frlgOptions = new FRLGSeedOptions(this);
+    ui->verticalLayout->insertWidget(1, frlgOptions);
     connect(frlgOptions, &FRLGSeedOptions::settingsChanged, searcherModel, &WildSearcherModel3::setFRLGSettings);
+    frlgOptions->addSeedLeeway(ui->gridLayout_2, ui->textBoxGeneratorSeed)->setObjectName("spinBoxGeneratorSeedLeeway");
 
     ui->textBoxGeneratorSeed->setValues(InputType::Seed32Bit);
     ui->textBoxGeneratorInitialAdvances->setValues(InputType::Advance32Bit);
@@ -74,6 +77,9 @@ Wild3::Wild3(QWidget *parent) : QWidget(parent), ui(new Ui::Wild3)
 
     ui->comboBoxGeneratorMethod->setup({ toInt(Method::Method1), toInt(Method::Method2), toInt(Method::Method4) });
     ui->comboBoxSearcherMethod->setup({ toInt(Method::Method1), toInt(Method::Method2), toInt(Method::Method4) });
+    // PokeFinderPlus: "All" runs every method and shows a Method column (Method::None = all)
+    ui->comboBoxGeneratorMethod->addItem(tr("All wild methods"), toInt(Method::None));
+    ui->comboBoxSearcherMethod->addItem(tr("All wild methods"), toInt(Method::None));
 
     ui->comboBoxGeneratorEncounter->setup({ toInt(Encounter::Grass), toInt(Encounter::RockSmash), toInt(Encounter::Surfing),
                                             toInt(Encounter::OldRod), toInt(Encounter::GoodRod), toInt(Encounter::SuperRod) });
@@ -114,6 +120,42 @@ Wild3::Wild3(QWidget *parent) : QWidget(parent), ui(new Ui::Wild3)
     auto *seedToTime = new QAction(tr("Generate times for seed"), ui->tableViewSearcher);
     connect(seedToTime, &QAction::triggered, this, &Wild3::seedToTime);
     ui->tableViewSearcher->addAction(seedToTime);
+
+    // PokeFinderPlus: Ten Lines' "Open in Calibration"
+    auto *calibrate = new QAction(tr("Calibrate in Generator"), ui->tableViewSearcher);
+    connect(calibrate, &QAction::triggered, this, [this, frlgOptions] {
+        QModelIndex index = ui->tableViewSearcher->currentIndex();
+        if (!index.isValid())
+        {
+            return;
+        }
+        int row = proxyModel->mapToSource(index).row();
+        auto result = searcherModel->getFRLGResult(row);
+        if (!result)
+        {
+            QMessageBox msg(QMessageBox::Warning, tr("No initial seed"),
+                            tr("This result has no FRLG initial seed with the current options."));
+            msg.exec();
+            return;
+        }
+
+        // Ten Lines' window: advances ± 1000, or Final A Press Frame ± 15 and Teachy TV Advances ± 15 (313 advances each)
+        u32 window = frlgOptions->getSettings().teachyTV ? 15 * 313 + 15 : 1000;
+        transferSettings(1);
+        frlgOptions->setSettingsKey(result->settings);
+        ui->textBoxGeneratorSeed->setText(QString::number(result->initialSeed, 16));
+        ui->textBoxGeneratorInitialAdvances->setText(QString::number(result->advances > window ? result->advances - window : 0));
+        ui->textBoxGeneratorMaxAdvances->setText(QString::number(2 * window));
+        ui->textBoxGeneratorOffset->setText("0");
+        int method = ui->comboBoxGeneratorMethod->findData(toInt(searcherModel->getMethod(row)));
+        if (method != -1)
+        {
+            ui->comboBoxGeneratorMethod->setCurrentIndex(method);
+        }
+        ui->tabRNGSelector->setCurrentIndex(0);
+        generate();
+    });
+    ui->tableViewSearcher->addAction(calibrate);
 
     connect(ui->profileDisplay, &ProfileDisplay3::profileChanged, this, &Wild3::profileChanged);
     connect(ui->profileDisplay, &ProfileDisplay3::profilesChanged, this, &Wild3::profilesChanged);
@@ -199,11 +241,37 @@ void Wild3::generate()
     auto effect = ui->comboBoxGeneratorItem->getEnum<Item>();
 
     auto filter = ui->filterGenerator->getFilter<WildStateFilter, true>();
-    WildGenerator3 generator(initialAdvances, maxAdvances, offset, method, lead, feebasTile, effect,
-                             encounterGenerator[ui->comboBoxGeneratorLocation->currentIndex()], *currentProfile, filter);
-
-    auto states = generator.generate(seed);
-    generatorModel->addItems(states);
+    // PokeFinderPlus: one run per seed (FRLG Seed ±) and per method ("All methods")
+    auto *frlgOptions = findChild<FRLGSeedOptions *>();
+    auto *leeway = findChild<QSpinBox *>("spinBoxGeneratorSeedLeeway");
+    bool frlgSeeds = frlgOptions != nullptr && frlgOptions->getSettings().enabled;
+    QString note;
+    std::vector<CalibrationSeed> seeds = frlgSeeds ? frlgOptions->calibrationSeeds(seed, leeway->value(), note)
+                                                   : std::vector<CalibrationSeed> { CalibrationSeed { seed, RowExtra() } };
+    std::vector<Method> methods = { method };
+    if (method == Method::None)
+    {
+        methods = { Method::Method1, Method::Method2, Method::Method4 };
+        auto *view = qobject_cast<QListView *>(ui->comboBoxGeneratorMethod->view());
+        std::erase_if(methods, [&](Method m) { return view->isRowHidden(ui->comboBoxGeneratorMethod->findData(toInt(m))); });
+    }
+    generatorModel->setExtraColumns(frlgSeeds, method == Method::None);
+    for (const auto &entry : seeds)
+    {
+        for (Method m : methods)
+        {
+            WildGenerator3 generator(initialAdvances, maxAdvances, offset, m, lead, feebasTile, effect,
+                                     encounterGenerator[ui->comboBoxGeneratorLocation->currentIndex()], *currentProfile, filter);
+            RowExtra extra = entry.extra;
+            extra.method = m;
+            generatorModel->addItems(generator.generate(entry.seed), extra);
+        }
+    }
+    if (!note.isEmpty() && leeway->value() > 0)
+    {
+        QMessageBox msg(QMessageBox::Information, tr("Seed ±"), note);
+        msg.exec();
+    }
 }
 
 void Wild3::generatorEncounterIndexChanged(int index)
@@ -357,41 +425,75 @@ void Wild3::search()
     auto item = ui->comboBoxSearcherItem->getEnum<Item>();
 
     auto filter = ui->filterSearcher->getFilter<WildStateFilter, true>();
-    auto *searcher = new WildSearcher3(method, lead, feebas, item, encounterSearcher[ui->comboBoxSearcherLocation->currentIndex()],
-                                       *currentProfile, filter);
+
+    // PokeFinderPlus: "All methods" runs one searcher per method; results are tagged with their method
+    std::vector<Method> methods = { method };
+    if (method == Method::None)
+    {
+        methods = { Method::Method1, Method::Method2, Method::Method4 };
+        auto *view = qobject_cast<QListView *>(ui->comboBoxSearcherMethod->view());
+        std::erase_if(methods, [&](Method m) { return view->isRowHidden(ui->comboBoxSearcherMethod->findData(toInt(m))); });
+    }
+    searcherModel->setShowMethod(method == Method::None);
 
     int maxProgress = 1;
     for (u8 i = 0; i < 6; i++)
     {
         maxProgress *= max[i] - min[i] + 1;
     }
-    searcher->setMaxProgress(maxProgress);
+
+    std::vector<std::pair<WildSearcher3 *, Method>> searchers;
+    for (Method m : methods)
+    {
+        auto *searcher = new WildSearcher3(m, lead, feebas, item, encounterSearcher[ui->comboBoxSearcherLocation->currentIndex()],
+                                           *currentProfile, filter);
+        searcher->setMaxProgress(maxProgress);
+        searchers.emplace_back(searcher, m);
+    }
 
     auto *timer = new QTimer(this);
-    connect(ui->pushButtonCancel, &QPushButton::clicked, timer, [this, searcher] {
-        searcher->cancelSearch();
+    connect(ui->pushButtonCancel, &QPushButton::clicked, timer, [this, searchers] {
+        for (const auto &[searcher, m] : searchers)
+        {
+            searcher->cancelSearch();
+        }
         ui->pushButtonCancel->setEnabled(false);
     });
-    connect(timer, &QTimer::timeout, this, [this, searcher, timer] {
-        searcherModel->addItems(searcher->getResults());
-        ui->progressBar->setValue(searcher->getProgress());
+    connect(timer, &QTimer::timeout, this, [this, searchers, timer] {
+        bool searching = false;
+        int progress = 0;
+        for (const auto &[searcher, m] : searchers)
+        {
+            searching |= searcher->isSearching();
+            searcherModel->addItems(searcher->getResults(), m);
+            progress += searcher->getProgress();
+        }
+        ui->progressBar->setValue(progress / static_cast<int>(searchers.size()));
 
-        if (!searcher->isSearching())
+        if (!searching)
         {
             timer->stop();
 
-            searcherModel->addItems(searcher->getResults());
-            ui->progressBar->setValue(searcher->getProgress());
+            progress = 0;
+            for (const auto &[searcher, m] : searchers)
+            {
+                searcherModel->addItems(searcher->getResults(), m);
+                progress += searcher->getProgress();
+                delete searcher;
+            }
+            ui->progressBar->setValue(progress / static_cast<int>(searchers.size()));
 
             ui->pushButtonSearch->setEnabled(true);
             ui->pushButtonCancel->setEnabled(false);
 
-            delete searcher;
             timer->deleteLater();
         }
     });
 
-    searcher->startSearch(min, max);
+    for (const auto &[searcher, m] : searchers)
+    {
+        searcher->startSearch(min, max);
+    }
     timer->start(1000);
 }
 

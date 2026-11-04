@@ -22,6 +22,7 @@
 #ifndef FRLGSEEDCOLUMNS_HPP
 #define FRLGSEEDCOLUMNS_HPP
 
+#include <Core/Enum/Method.hpp>
 #include <Core/Gen3/Tools/FRLGInitialSeed.hpp>
 #include <QVariant>
 #include <optional>
@@ -66,9 +67,63 @@ public:
      */
     void setSettings(const FRLGSeedSettings &settings);
 
+    /**
+     * @brief Best initial seed for \p seed (nullopt if none or disabled)
+     */
+    std::optional<FRLGInitialSeedResult> result(u32 seed) const;
+
+    /**
+     * @brief Current options
+     */
+    const FRLGSeedSettings &getSettings() const
+    {
+        return settings;
+    }
+
 private:
     FRLGSeedSettings settings;
     mutable std::unordered_map<u32, std::optional<FRLGInitialSeedResult>> cache;
+};
+
+/**
+ * @brief Per-row data the Gen 3 states don't carry: the method that produced the row, and (Generator) the initial seed used
+ */
+struct RowExtra
+{
+    Method method = Method::None;
+    int initialSeed = -1; ///< -1 when not from the FRLG seed list
+    int seedTimeMs = -1; ///< -1 when unknown
+};
+
+/**
+ * @brief "Method 1", "Method 2", "Method 4" (static) or "Wild 1", "Wild 2", "Wild 4" (wild), as in the method lists
+ */
+QString methodName(Method method, bool wild = false);
+
+/**
+ * @brief Extra Generator columns after Advances: Initial Seed, Seed Time (ms) and/or Method
+ */
+class GeneratorExtraColumns
+{
+public:
+    bool seed = false; ///< Show Initial Seed and Seed Time
+    bool method = false; ///< Show Method
+    bool wild = false; ///< Wild method names
+
+    /**
+     * @brief Number of extra columns
+     */
+    int count() const;
+
+    /**
+     * @brief Header of extra column \p column
+     */
+    QVariant header(int column) const;
+
+    /**
+     * @brief Value of extra column \p column for \p extra
+     */
+    QVariant data(const RowExtra &extra, int column) const;
 };
 
 #endif // FRLGSEEDCOLUMNS_HPP

@@ -27,8 +27,17 @@
 
 class QCheckBox;
 class QComboBox;
-class QLabel;
+class QGridLayout;
 class QSpinBox;
+
+/**
+ * @brief A seed to generate from in the Generator, with what to show in its Initial Seed / Seed Time columns
+ */
+struct CalibrationSeed
+{
+    u32 seed;
+    RowExtra extra;
+};
 
 /**
  * @brief Game, console, settings and Teachy TV options for the FRLG initial seed columns
@@ -68,6 +77,29 @@ public:
      */
     FRLGSeedSettings getSettings() const;
 
+    /**
+     * @brief Sets sound, button mode, seed button and extra button from a Ten Lines settings key (e.g. mono_a_start_startup_select)
+     */
+    void setSettingsKey(const std::string &settings);
+
+    /**
+     * @brief Full Ten Lines settings key (e.g. mono_a_a_none), empty if any option is "Any"
+     */
+    std::string settingsKey() const;
+
+    /**
+     * @brief Seeds for the Generator: \p seed and, for an FRLG profile with Seed ± > 0, its neighbours in the farmed list
+     * (Ten Lines' calibration). Falls back to \p seed alone, and explains why in \p note.
+     */
+    std::vector<CalibrationSeed> calibrationSeeds(u32 seed, u32 leeway, QString &note) const;
+
+    /**
+     * @brief Puts a "Seed ±" spin box (Ten Lines default 20) to the right of \p seedBox in \p grid
+     *
+     * @return The spin box; it and its label only show for FRLG profiles
+     */
+    QSpinBox *addSeedLeeway(QGridLayout *grid, QWidget *seedBox);
+
 private:
     QComboBox *game;
     QComboBox *console;
@@ -77,7 +109,7 @@ private:
     QComboBox *held;
     QCheckBox *teachyTV;
     QSpinBox *regularOut;
-    QLabel *status;
+    QString savedGame;
     bool frlg = false;
 
 private slots:

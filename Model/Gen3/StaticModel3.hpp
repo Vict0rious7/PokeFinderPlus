@@ -34,6 +34,23 @@ class StaticGeneratorModel3 final : public TableModel<GeneratorState>
 {
     Q_OBJECT
 public:
+    using TableModel<GeneratorState>::addItems;
+
+    /**
+     * @brief PokeFinderPlus: adds states generated from \p extra's initial seed with its method
+     */
+    void addItems(const std::vector<GeneratorState> &states, const RowExtra &extra);
+
+    /**
+     * @brief PokeFinderPlus: clears states and their extras
+     */
+    void clearModel();
+
+    /**
+     * @brief PokeFinderPlus: which extra columns to show (Initial Seed + Seed Time, Method)
+     */
+    void setExtraColumns(bool seed, bool method);
+
     /**
      * @brief Construct a new StaticGeneratorModel3 object
      *
@@ -80,6 +97,8 @@ public slots:
     void setShowStats(bool flag);
 
 private:
+    std::vector<RowExtra> extras; // PokeFinderPlus
+    GeneratorExtraColumns extraColumns; // PokeFinderPlus
     QStringList header = { tr("Advances"), tr("PID"), tr("Shiny"), tr("Nature"), tr("Ability"), tr("HP"),    tr("Atk"),
                            tr("Def"),      tr("SpA"), tr("SpD"),   tr("Spe"),    tr("Hidden"),  tr("Power"), tr("Gender") };
     bool showStats;
@@ -92,6 +111,33 @@ class StaticSearcherModel3 : public TableModel<SearcherState>
 {
     Q_OBJECT
 public:
+    using TableModel<SearcherState>::addItems;
+
+    /**
+     * @brief PokeFinderPlus: adds results found with \p method (shown when the Method column is on)
+     */
+    void addItems(const std::vector<SearcherState> &states, Method method);
+
+    /**
+     * @brief PokeFinderPlus: clears results and their methods
+     */
+    void clearModel();
+
+    /**
+     * @brief PokeFinderPlus: method of row \p row
+     */
+    Method getMethod(int row) const;
+
+    /**
+     * @brief PokeFinderPlus: shows the Method column ("All methods" searches)
+     */
+    void setShowMethod(bool flag);
+
+    /**
+     * @brief PokeFinderPlus: best FRLG initial seed of row \p row (nullopt if none or FRLG columns are off)
+     */
+    std::optional<FRLGInitialSeedResult> getFRLGResult(int row) const;
+
     /**
      * @brief Construct a new StaticSearcherModel3 object
      *
@@ -143,6 +189,8 @@ public slots:
     void setShowStats(bool flag);
 
 private:
+    std::vector<Method> methods; // PokeFinderPlus
+    bool showMethod = false; // PokeFinderPlus
     FRLGSeedColumns frlg; // PokeFinderPlus
     QStringList header = { tr("Seed"), tr("PID"), tr("Shiny"), tr("Nature"), tr("Ability"), tr("HP"),    tr("Atk"),
                            tr("Def"),  tr("SpA"), tr("SpD"),   tr("Spe"),    tr("Hidden"),  tr("Power"), tr("Gender") };

@@ -29,7 +29,7 @@ StaticGeneratorModel3::StaticGeneratorModel3(QObject *parent) : TableModel(paren
 
 int StaticGeneratorModel3::columnCount(const QModelIndex &parent) const
 {
-    return 14;
+    return 14 + extraColumns.count();
 }
 
 QVariant StaticGeneratorModel3::data(const QModelIndex &index, int role) const
@@ -38,6 +38,15 @@ QVariant StaticGeneratorModel3::data(const QModelIndex &index, int role) const
     {
         const auto &state = model[index.row()];
         int column = index.column();
+        // PokeFinderPlus: Initial Seed, Seed Time and Method right after Advances
+        if (column >= 1 && column <= extraColumns.count())
+        {
+            return extraColumns.data(index.row() < static_cast<int>(extras.size()) ? extras[index.row()] : RowExtra(), column - 1);
+        }
+        if (column > extraColumns.count())
+        {
+            column -= extraColumns.count();
+        }
         switch (column)
         {
         case 0:
@@ -75,7 +84,12 @@ QVariant StaticGeneratorModel3::headerData(int section, Qt::Orientation orientat
 {
     if (role == Qt::DisplayRole && orientation == Qt::Horizontal)
     {
-        return header[section];
+        // PokeFinderPlus: Initial Seed, Seed Time and Method right after Advances
+        if (section >= 1 && section <= extraColumns.count())
+        {
+            return extraColumns.header(section - 1);
+        }
+        return header[section > extraColumns.count() ? section - extraColumns.count() : section];
     }
     return QVariant();
 }
@@ -83,7 +97,7 @@ QVariant StaticGeneratorModel3::headerData(int section, Qt::Orientation orientat
 void StaticGeneratorModel3::setShowStats(bool flag)
 {
     showStats = flag;
-    emit dataChanged(index(0, 5), index(rowCount() - 1, 10), { Qt::DisplayRole });
+    emit dataChanged(index(0, 5 + extraColumns.count()), index(rowCount() - 1, 10 + extraColumns.count()), { Qt::DisplayRole });
 }
 
 StaticSearcherModel3::StaticSearcherModel3(QObject *parent) : TableModel(parent), showStats(false)
@@ -92,7 +106,7 @@ StaticSearcherModel3::StaticSearcherModel3(QObject *parent) : TableModel(parent)
 
 int StaticSearcherModel3::columnCount(const QModelIndex &parent) const
 {
-    return 14 + frlg.count();
+    return 14 + frlg.count() + (showMethod ? 1 : 0);
 }
 
 QVariant StaticSearcherModel3::data(const QModelIndex &index, int role) const
@@ -101,14 +115,18 @@ QVariant StaticSearcherModel3::data(const QModelIndex &index, int role) const
     {
         const auto &state = model[index.row()];
         int column = index.column();
-        // PokeFinderPlus: FRLG initial seed columns right after Seed
+        // PokeFinderPlus: FRLG initial seed columns, then Method, right after Seed
         if (column >= 1 && column <= frlg.count())
         {
             return frlg.data(state.getSeed(), column - 1);
         }
+        if (showMethod && column == frlg.count() + 1)
+        {
+            return methodName(index.row() < static_cast<int>(methods.size()) ? methods[index.row()] : Method::None);
+        }
         if (column > frlg.count())
         {
-            column -= frlg.count();
+            column -= frlg.count() + (showMethod ? 1 : 0);
         }
         switch (column)
         {
@@ -152,7 +170,11 @@ QVariant StaticSearcherModel3::headerData(int section, Qt::Orientation orientati
         {
             return frlg.header(section - 1);
         }
-        return header[section > frlg.count() ? section - frlg.count() : section];
+        if (showMethod && section == frlg.count() + 1)
+        {
+            return tr("Method");
+        }
+        return header[section > frlg.count() ? section - frlg.count() - (showMethod ? 1 : 0) : section];
     }
     return QVariant();
 }
@@ -160,7 +182,8 @@ QVariant StaticSearcherModel3::headerData(int section, Qt::Orientation orientati
 void StaticSearcherModel3::setShowStats(bool flag)
 {
     showStats = flag;
-    emit dataChanged(index(0, 5 + frlg.count()), index(rowCount() - 1, 10 + frlg.count()), { Qt::DisplayRole });
+    emit dataChanged(index(0, 5 + frlg.count() + (showMethod ? 1 : 0)), index(rowCount() - 1, 10 + frlg.count() + (showMethod ? 1 : 0)),
+                     { Qt::DisplayRole });
 }
 
 void StaticSearcherModel3::setFRLGSettings(const FRLGSeedSettings &settings)
@@ -168,4 +191,56 @@ void StaticSearcherModel3::setFRLGSettings(const FRLGSeedSettings &settings)
     beginResetModel();
     frlg.setSettings(settings);
     endResetModel();
+}
+
+void StaticSearcherModel3::addItems(const std::vector<SearcherState> &states, Method method)
+{
+    methods.insert(methods.end(), states.size(), method);
+    TableModel<SearcherState>::addItems(states);
+}
+
+void StaticSearcherModel3::clearModel()
+{
+    methods.clear();
+    TableModel<SearcherState>::clearModel();
+}
+
+Method StaticSearcherModel3::getMethod(int row) const
+{
+    return row < static_cast<int>(methods.size()) ? methods[row] : Method::None;
+}
+
+void StaticSearcherModel3::setShowMethod(bool flag)
+{
+    beginResetModel();
+    showMethod = flag;
+    endResetModel();
+}
+
+std::optional<FRLGInitialSeedResult> StaticSearcherModel3::getFRLGResult(int row) const
+{
+    return frlg.result(model[row].getSeed());
+}
+
+void StaticGeneratorModel3::addItems(const std::vector<GeneratorState> &states, const RowExtra &extra)
+{
+    extras.insert(extras.end(), states.size(), extra);
+    TableModel<GeneratorState>::addItems(states);
+}
+
+void StaticGeneratorModel3::clearModel()
+{
+    extras.clear();
+    TableModel<GeneratorState>::clearModel();
+}
+
+void StaticGeneratorModel3::setExtraColumns(bool seed, bool method)
+{
+    if (extraColumns.seed != seed || extraColumns.method != method)
+    {
+        beginResetModel();
+        extraColumns.seed = seed;
+        extraColumns.method = method;
+        endResetModel();
+    }
 }
