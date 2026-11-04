@@ -188,6 +188,19 @@ Wild3::Wild3(QWidget *parent) : QWidget(parent), ui(new Ui::Wild3)
     connect(ui->filterGenerator, &Filter::showStatsChanged, generatorModel, &WildGeneratorModel3::setShowStats);
     connect(ui->filterSearcher, &Filter::showStatsChanged, searcherModel, &WildSearcherModel3::setShowStats);
 
+    // IV Calculator: select its species if the current location has it
+    auto selectSpecie = [](QComboBox *comboBox, u16 specie) {
+        int index = comboBox->findData(specie);
+        if (index > 0)
+        {
+            comboBox->setCurrentIndex(index);
+        }
+    };
+    connect(ui->filterGenerator, &Filter::specieCalculated, this,
+            [this, selectSpecie](u16 specie) { selectSpecie(ui->comboBoxGeneratorPokemon, specie); });
+    connect(ui->filterSearcher, &Filter::specieCalculated, this,
+            [this, selectSpecie](u16 specie) { selectSpecie(ui->comboBoxSearcherPokemon, specie); });
+
     updateProfiles();
     generatorEncounterIndexChanged(0);
     searcherEncounterIndexChanged(0);

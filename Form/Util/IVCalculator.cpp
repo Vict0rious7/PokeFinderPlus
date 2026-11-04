@@ -26,6 +26,7 @@
 #include <Core/Util/Translator.hpp>
 #include <QSettings>
 #include <QSpinBox>
+#include <algorithm>
 
 IVCalculator::IVCalculator(QWidget *parent) : QWidget(parent), ui(new Ui::IVCalculator), rows(0)
 {
@@ -218,6 +219,7 @@ void IVCalculator::findIVs()
                                          .arg(nextLevel[5]));
 
     emit ivsCalculated(ivs);
+    emit pokemonCalculated(specie, ui->comboBoxNature->currentIndex() - 1, *std::min_element(levels.begin(), levels.end()));
 }
 
 void IVCalculator::gameIndexChanged(int index)

@@ -39,6 +39,7 @@ Filter::Filter(QWidget *parent) : QWidget(parent), ui(new Ui::Filter)
 
     connect(ui->ivFilter, &IVFilter::ivsChanged, this, &Filter::ivsChanged);
     connect(ui->ivFilter, &IVFilter::showStatsChanged, this, &Filter::showStatsChanged);
+    connect(ui->ivFilter, &IVFilter::pokemonCalculated, this, &Filter::updatePokemon);
 }
 
 Filter::~Filter()
@@ -299,4 +300,22 @@ u8 Filter::getWeightMax() const
 u8 Filter::getWeightMin() const
 {
     return static_cast<u8>(ui->spinBoxWeightMin->value());
+}
+
+void Filter::updatePokemon(u16 specie, int nature, int level)
+{
+    emit specieCalculated(specie);
+
+    if (nature >= 0 && nature < 25 && ui->checkListNature->isVisibleTo(this))
+    {
+        std::vector<bool> natures(25, false);
+        natures[nature] = true;
+        ui->checkListNature->setChecks(natures);
+    }
+
+    if (ui->spinBoxLevelMin->isVisibleTo(this))
+    {
+        ui->spinBoxLevelMin->setValue(level);
+        ui->spinBoxLevelMax->setValue(level);
+    }
 }

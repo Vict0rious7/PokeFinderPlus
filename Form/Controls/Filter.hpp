@@ -48,6 +48,11 @@ signals:
      */
     void ivsChanged();
 
+    /**
+     * @brief Emits the species found by the IV Calculator, before its nature and level are applied
+     */
+    void specieCalculated(u16 specie);
+
 public:
     /**
      * @brief Construct a new Filter object
@@ -259,6 +264,16 @@ public:
 
 private:
     Ui::Filter *ui;
+
+private slots:
+    /**
+     * @brief Applies the species, nature and level found by the IV Calculator, where this filter shows those fields
+     *
+     * @param specie Species, emitted first so a window can select it (which may reset the level range)
+     * @param nature Nature index, -1 leaves the nature filter unchanged
+     * @param level Level to set as both minimum and maximum
+     */
+    void updatePokemon(u16 specie, int nature, int level);
 };
 
 #endif // FILTER_HPP

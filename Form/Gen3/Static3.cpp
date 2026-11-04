@@ -148,6 +148,25 @@ Static3::Static3(QWidget *parent) : QWidget(parent), ui(new Ui::Static3)
     connect(ui->filterGenerator, &Filter::showStatsChanged, generatorModel, &StaticGeneratorModel3::setShowStats);
     connect(ui->filterSearcher, &Filter::showStatsChanged, searcherModel, &StaticSearcherModel3::setShowStats);
 
+    // IV Calculator: select its species if the current category has it
+    auto selectSpecie = [](const QComboBox *category, QComboBox *pokemon, u16 specie) {
+        for (int i = 0; i < pokemon->count(); i++)
+        {
+            const StaticTemplate3 *staticTemplate = Encounters3::getStaticEncounter(category->currentIndex(), pokemon->itemData(i).toInt());
+            if (staticTemplate->getSpecie() == specie)
+            {
+                pokemon->setCurrentIndex(i);
+                return;
+            }
+        }
+    };
+    connect(ui->filterGenerator, &Filter::specieCalculated, this, [this, selectSpecie](u16 specie) {
+        selectSpecie(ui->comboBoxGeneratorCategory, ui->comboBoxGeneratorPokemon, specie);
+    });
+    connect(ui->filterSearcher, &Filter::specieCalculated, this, [this, selectSpecie](u16 specie) {
+        selectSpecie(ui->comboBoxSearcherCategory, ui->comboBoxSearcherPokemon, specie);
+    });
+
     updateProfiles();
     generatorCategoryIndexChanged(0);
     searcherCategoryIndexChanged(0);

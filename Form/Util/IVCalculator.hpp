@@ -42,6 +42,11 @@ signals:
      */
     void ivsCalculated(std::array<std::vector<u8>, 6>);
 
+    /**
+     * @brief Emits the selected species, nature (-1 if none) and the lowest entered level (likely the catch level)
+     */
+    void pokemonCalculated(u16 specie, int nature, int level);
+
 public:
     /**
      * @brief Construct a new IVCalculator object

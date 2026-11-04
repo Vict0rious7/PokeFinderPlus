@@ -377,6 +377,7 @@ void IVFilter::openIVCalculator() const
 {
     auto *calculator = new IVCalculator();
     connect(calculator, &IVCalculator::ivsCalculated, this, &IVFilter::updateIVs);
+    connect(calculator, &IVCalculator::pokemonCalculated, this, &IVFilter::pokemonCalculated);
     calculator->show();
 }
 

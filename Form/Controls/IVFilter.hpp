@@ -47,6 +47,11 @@ signals:
      */
     void ivsChanged();
 
+    /**
+     * @brief Relays the species, nature (-1 if none) and lowest level from the IV Calculator
+     */
+    void pokemonCalculated(u16 specie, int nature, int level);
+
 public:
     /**
      * @brief Construct a new IVFilter object
