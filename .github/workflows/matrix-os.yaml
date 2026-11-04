@@ -146,10 +146,11 @@ jobs:
       - name: Package PokeFinder (macOS)
         if: matrix.platform-name == 'macOS'
         run: |
-          mv build/PokeFinder.app .
-          macdeployqt PokeFinder.app -verbose=3
-          tar czf PokeFinder-macOS.tar.gz PokeFinder.app
-          mkdir upload && mv PokeFinder.app upload
+          # PokeFinderPlus: the macOS bundle is PokeFinderPlus.app
+          mv build/PokeFinderPlus.app .
+          macdeployqt PokeFinderPlus.app -verbose=3
+          tar czf PokeFinder-macOS.tar.gz PokeFinderPlus.app
+          mkdir upload && mv PokeFinderPlus.app upload
 
       - name: Upload Artifact (Windows / macOS)
         if: matrix.platform-name != 'Ubuntu'

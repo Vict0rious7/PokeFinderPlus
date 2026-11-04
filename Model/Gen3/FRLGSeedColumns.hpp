@@ -24,6 +24,7 @@
 
 #include <Core/Enum/Method.hpp>
 #include <Core/Gen3/Tools/FRLGInitialSeed.hpp>
+#include <Model/SortFilterProxyModel.hpp>
 #include <QVariant>
 #include <optional>
 #include <unordered_map>
@@ -61,6 +62,19 @@ public:
      * @brief Value of extra column \p column for a result whose seed is \p seed
      */
     QVariant data(u32 seed, int column) const;
+
+    /**
+     * @brief Numeric sort key of extra column \p column (Qt::UserRole); results without an initial seed sort last
+     */
+    QVariant sortData(u32 seed, int column) const;
+
+    /**
+     * @brief Table column of Total Time, counting the Seed column before the extra columns
+     */
+    int totalTimeColumn() const
+    {
+        return 1 + (settings.teachyTV ? 5 : 3);
+    }
 
     /**
      * @brief Replaces the options and clears the cache
@@ -101,7 +115,7 @@ struct RowExtra
 QString methodName(Method method, bool wild = false);
 
 /**
- * @brief Extra Generator columns after Advances: Initial Seed, Seed Time (ms) and/or Method
+ * @brief Extra Generator columns: Initial Seed and Seed Time (ms) before Advances, Method after it
  */
 class GeneratorExtraColumns
 {
@@ -116,14 +130,47 @@ public:
     int count() const;
 
     /**
-     * @brief Header of extra column \p column
+     * @brief Maps a table column
+     *
+     * @param column Table column
+     * @param upstream Set to the model's own column when the table column is not an extra one
+     *
+     * @return Extra column (0 Initial Seed, 1 Seed Time, 2 Method), or -1 for the model's own columns
      */
-    QVariant header(int column) const;
+    int map(int column, int &upstream) const;
 
     /**
-     * @brief Value of extra column \p column for \p extra
+     * @brief Header of extra column \p extra (0 Initial Seed, 1 Seed Time, 2 Method)
+     */
+    QVariant header(int extra) const;
+
+    /**
+     * @brief Value of extra column \p column (0 Initial Seed, 1 Seed Time, 2 Method) for \p extra
      */
     QVariant data(const RowExtra &extra, int column) const;
+};
+
+/**
+ * @brief Sorts by Qt::UserRole when both cells have one (FRLG columns: numbers, Total Time in ms), by the shown text otherwise
+ */
+class FRLGSortProxyModel : public SortFilterProxyModel
+{
+public:
+    FRLGSortProxyModel(QObject *parent, QAbstractItemModel *model) : SortFilterProxyModel(parent, model)
+    {
+    }
+
+protected:
+    bool lessThan(const QModelIndex &left, const QModelIndex &right) const override
+    {
+        QVariant l = left.data(Qt::UserRole);
+        QVariant r = right.data(Qt::UserRole);
+        if (l.isValid() && r.isValid())
+        {
+            return l.toLongLong() < r.toLongLong();
+        }
+        return SortFilterProxyModel::lessThan(left, right);
+    }
 };
 
 #endif // FRLGSEEDCOLUMNS_HPP

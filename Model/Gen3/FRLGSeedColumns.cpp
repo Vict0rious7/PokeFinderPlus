@@ -22,6 +22,7 @@
 #include "FRLGSeedColumns.hpp"
 #include <QObject>
 #include <QString>
+#include <limits>
 
 int FRLGSeedColumns::count() const
 {
@@ -107,6 +108,47 @@ QVariant FRLGSeedColumns::data(u32 seed, int column) const
     }
 }
 
+QVariant FRLGSeedColumns::sortData(u32 seed, int column) const
+{
+    if (!settings.teachyTV && column >= 3)
+    {
+        column += 2;
+    }
+    if (column == 6)
+    {
+        return QVariant(); // Settings: sort by text
+    }
+    auto found = result(seed);
+    if (!found)
+    {
+        return std::numeric_limits<qint64>::max();
+    }
+
+    u32 visualFrame = found->advances;
+    u32 ttvAdvances = 0;
+    if (settings.teachyTV)
+    {
+        u32 regular;
+        FRLGInitialSeed::teachyTVConversion(found->advances, settings.regularOut, ttvAdvances, regular);
+        visualFrame = ttvAdvances + regular;
+    }
+    switch (column)
+    {
+    case 0:
+        return static_cast<qint64>(found->initialSeed);
+    case 1:
+        return static_cast<qint64>(FRLGInitialSeed::frameToMS(found->seedTime / 16.0, settings.console));
+    case 2:
+        return static_cast<qint64>(found->advances);
+    case 3:
+        return static_cast<qint64>(visualFrame);
+    case 4:
+        return static_cast<qint64>(ttvAdvances);
+    default:
+        return static_cast<qint64>(FRLGInitialSeed::frameToMS(found->seedTime / 16.0 + visualFrame, settings.console));
+    }
+}
+
 void FRLGSeedColumns::setSettings(const FRLGSeedSettings &settings)
 {
     this->settings = settings;
@@ -133,24 +175,48 @@ int GeneratorExtraColumns::count() const
     return (seed ? 2 : 0) + (method ? 1 : 0);
 }
 
-QVariant GeneratorExtraColumns::header(int column) const
+int GeneratorExtraColumns::map(int column, int &upstream) const
 {
-    if (seed && column < 2)
+    int before = seed ? 2 : 0;
+    if (column < before)
     {
-        return column == 0 ? QObject::tr("Initial Seed") : QObject::tr("Seed Time (ms)");
+        return column;
     }
-    return QObject::tr("Method");
+    if (column == before)
+    {
+        upstream = 0;
+        return -1;
+    }
+    if (method && column == before + 1)
+    {
+        return 2;
+    }
+    upstream = column - before - (method ? 1 : 0);
+    return -1;
+}
+
+QVariant GeneratorExtraColumns::header(int extra) const
+{
+    switch (extra)
+    {
+    case 0:
+        return QObject::tr("Initial Seed");
+    case 1:
+        return QObject::tr("Seed Time (ms)");
+    default:
+        return QObject::tr("Method");
+    }
 }
 
 QVariant GeneratorExtraColumns::data(const RowExtra &extra, int column) const
 {
-    if (seed && column == 0)
+    switch (column)
     {
+    case 0:
         return extra.initialSeed < 0 ? QVariant("-") : QVariant(QString::number(extra.initialSeed, 16).toUpper().rightJustified(4, '0'));
-    }
-    if (seed && column == 1)
-    {
+    case 1:
         return extra.seedTimeMs < 0 ? QVariant("-") : QVariant(extra.seedTimeMs);
+    default:
+        return methodName(extra.method, wild);
     }
-    return methodName(extra.method, wild);
 }

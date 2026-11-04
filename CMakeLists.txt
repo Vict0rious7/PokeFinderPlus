@@ -52,6 +52,11 @@ set_target_properties(PokeFinder PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME PokeFinderPlus # PokeFinderPlus: name in the macOS menu bar (settings keep the PokeFinder name)
 )
 
+# PokeFinderPlus: the Dock and Finder show the bundle's file name, so build PokeFinderPlus.app on macOS
+if (APPLE)
+    set_target_properties(PokeFinder PROPERTIES OUTPUT_NAME PokeFinderPlus)
+endif()
+
 target_link_libraries(PokeFinder PRIVATE PokeFinderCore PokeFinderForm Qt6::Core Qt6::Widgets Threads::Threads)
 
 qt_finalize_target(PokeFinder)

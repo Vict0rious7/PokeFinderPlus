@@ -59,7 +59,7 @@ Wild3::Wild3(QWidget *parent) : QWidget(parent), ui(new Ui::Wild3)
 
     generatorModel = new WildGeneratorModel3(ui->tableViewGenerator);
     searcherModel = new WildSearcherModel3(ui->tableViewSearcher);
-    proxyModel = new SortFilterProxyModel(ui->tableViewSearcher, searcherModel);
+    proxyModel = new FRLGSortProxyModel(ui->tableViewSearcher, searcherModel); // PokeFinderPlus: numeric FRLG sorting
 
     ui->tableViewGenerator->setModel(generatorModel);
     ui->tableViewSearcher->setModel(proxyModel);
@@ -68,6 +68,13 @@ Wild3::Wild3(QWidget *parent) : QWidget(parent), ui(new Ui::Wild3)
     auto *frlgOptions = new FRLGSeedOptions(this);
     ui->verticalLayout->insertWidget(1, frlgOptions);
     connect(frlgOptions, &FRLGSeedOptions::settingsChanged, searcherModel, &WildSearcherModel3::setFRLGSettings);
+    connect(frlgOptions, &FRLGSeedOptions::settingsChanged, this, [this] {
+        // PokeFinderPlus: FRLG results from shortest to longest total time
+        if (int column = searcherModel->getTotalTimeColumn(); column != -1)
+        {
+            ui->tableViewSearcher->sortByColumn(column, Qt::AscendingOrder);
+        }
+    });
     frlgOptions->addSeedLeeway(ui->gridLayout_2, ui->textBoxGeneratorSeed)->setObjectName("spinBoxGeneratorSeedLeeway");
 
     ui->textBoxGeneratorSeed->setValues(InputType::Seed32Bit);
@@ -80,6 +87,13 @@ Wild3::Wild3(QWidget *parent) : QWidget(parent), ui(new Ui::Wild3)
     // PokeFinderPlus: "All" runs every method and shows a Method column (Method::None = all)
     ui->comboBoxGeneratorMethod->addItem(tr("All wild methods"), toInt(Method::None));
     ui->comboBoxSearcherMethod->addItem(tr("All wild methods"), toInt(Method::None));
+    auto updateGeneratorColumns = [this, frlgOptions] {
+        generatorModel->setExtraColumns(frlgOptions->getSettings().enabled, ui->comboBoxGeneratorMethod->getEnum<Method>() == Method::None);
+    };
+    connect(frlgOptions, &FRLGSeedOptions::settingsChanged, this, updateGeneratorColumns);
+    connect(ui->comboBoxGeneratorMethod, &QComboBox::currentIndexChanged, this, updateGeneratorColumns);
+    connect(ui->comboBoxSearcherMethod, &QComboBox::currentIndexChanged, this,
+            [this] { searcherModel->setShowMethod(ui->comboBoxSearcherMethod->getEnum<Method>() == Method::None); });
 
     ui->comboBoxGeneratorEncounter->setup({ toInt(Encounter::Grass), toInt(Encounter::RockSmash), toInt(Encounter::Surfing),
                                             toInt(Encounter::OldRod), toInt(Encounter::GoodRod), toInt(Encounter::SuperRod) });
@@ -255,7 +269,6 @@ void Wild3::generate()
         auto *view = qobject_cast<QListView *>(ui->comboBoxGeneratorMethod->view());
         std::erase_if(methods, [&](Method m) { return view->isRowHidden(ui->comboBoxGeneratorMethod->findData(toInt(m))); });
     }
-    generatorModel->setExtraColumns(frlgSeeds, method == Method::None);
     for (const auto &entry : seeds)
     {
         for (Method m : methods)
@@ -434,7 +447,10 @@ void Wild3::search()
         auto *view = qobject_cast<QListView *>(ui->comboBoxSearcherMethod->view());
         std::erase_if(methods, [&](Method m) { return view->isRowHidden(ui->comboBoxSearcherMethod->findData(toInt(m))); });
     }
-    searcherModel->setShowMethod(method == Method::None);
+    if (int column = searcherModel->getTotalTimeColumn(); column != -1)
+    {
+        ui->tableViewSearcher->sortByColumn(column, Qt::AscendingOrder); // PokeFinderPlus: shortest total time first
+    }
 
     int maxProgress = 1;
     for (u8 i = 0; i < 6; i++)

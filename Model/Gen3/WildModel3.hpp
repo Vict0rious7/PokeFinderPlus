@@ -124,6 +124,11 @@ public:
     void clearModel();
 
     /**
+     * @brief PokeFinderPlus: table column of the FRLG Total Time, -1 when the FRLG columns are off
+     */
+    int getTotalTimeColumn() const;
+
+    /**
      * @brief PokeFinderPlus: method of row \p row
      */
     Method getMethod(int row) const;

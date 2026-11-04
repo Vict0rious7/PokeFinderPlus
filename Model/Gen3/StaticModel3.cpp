@@ -38,14 +38,11 @@ QVariant StaticGeneratorModel3::data(const QModelIndex &index, int role) const
     {
         const auto &state = model[index.row()];
         int column = index.column();
-        // PokeFinderPlus: Initial Seed, Seed Time and Method right after Advances
-        if (column >= 1 && column <= extraColumns.count())
+        // PokeFinderPlus: Initial Seed and Seed Time before Advances, Method after it
+        int extra = extraColumns.map(column, column);
+        if (extra != -1)
         {
-            return extraColumns.data(index.row() < static_cast<int>(extras.size()) ? extras[index.row()] : RowExtra(), column - 1);
-        }
-        if (column > extraColumns.count())
-        {
-            column -= extraColumns.count();
+            return extraColumns.data(index.row() < static_cast<int>(extras.size()) ? extras[index.row()] : RowExtra(), extra);
         }
         switch (column)
         {
@@ -84,12 +81,9 @@ QVariant StaticGeneratorModel3::headerData(int section, Qt::Orientation orientat
 {
     if (role == Qt::DisplayRole && orientation == Qt::Horizontal)
     {
-        // PokeFinderPlus: Initial Seed, Seed Time and Method right after Advances
-        if (section >= 1 && section <= extraColumns.count())
-        {
-            return extraColumns.header(section - 1);
-        }
-        return header[section > extraColumns.count() ? section - extraColumns.count() : section];
+        // PokeFinderPlus: Initial Seed and Seed Time before Advances, Method after it
+        int extra = extraColumns.map(section, section);
+        return extra != -1 ? extraColumns.header(extra) : QVariant(header[section]);
     }
     return QVariant();
 }
@@ -111,6 +105,12 @@ int StaticSearcherModel3::columnCount(const QModelIndex &parent) const
 
 QVariant StaticSearcherModel3::data(const QModelIndex &index, int role) const
 {
+    // PokeFinderPlus: numeric sort keys for the FRLG columns (see FRLGSortProxyModel)
+    if (role == Qt::UserRole)
+    {
+        int column = index.column();
+        return column >= 1 && column <= frlg.count() ? frlg.sortData(model[index.row()].getSeed(), column - 1) : QVariant();
+    }
     if (role == Qt::DisplayRole)
     {
         const auto &state = model[index.row()];
@@ -203,6 +203,11 @@ void StaticSearcherModel3::clearModel()
 {
     methods.clear();
     TableModel<SearcherState>::clearModel();
+}
+
+int StaticSearcherModel3::getTotalTimeColumn() const
+{
+    return frlg.count() > 0 ? frlg.totalTimeColumn() : -1;
 }
 
 Method StaticSearcherModel3::getMethod(int row) const
