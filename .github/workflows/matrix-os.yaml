@@ -5,9 +5,11 @@ on:
     branches:
       - "master"
       - "feature/**"
+      - "today-seed-picker" # PokeFinderPlus: test builds of the fork's working branch
     tags:
       - "v[0-9]+\\.[0-9]+\\.[0-9]+"
   pull_request:
+  workflow_dispatch: # PokeFinderPlus: build any branch from the Actions tab
 
 jobs:
   ci:
