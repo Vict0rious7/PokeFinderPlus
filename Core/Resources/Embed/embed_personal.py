@@ -1,3 +1,4 @@
+# Modified 2026-11-07 by Vict0rious7 for PokeFinderPlus (unofficial fork): Gen 6 personal table (ORAS).
 import glob
 import os
 import struct

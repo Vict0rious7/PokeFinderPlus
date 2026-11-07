@@ -18,6 +18,7 @@
  *
  * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
  * window title, About box and update check point to the fork; About credits the FRLG seed data.
+ * 2026-11-07: Gen 6 tab (Static, Seed Finder) and Gen 6 profile manager.
  */
 
 #include "MainWindow.hpp"
