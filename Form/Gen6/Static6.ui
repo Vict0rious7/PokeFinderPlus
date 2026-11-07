@@ -95,7 +95,21 @@
         </property>
        </widget>
       </item>
-      <item row="6" column="0" colspan="2">
+      <item row="6" column="0">
+       <widget class="QLabel" name="labelTarget">
+        <property name="text">
+         <string>Target</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <widget class="TextBox" name="textBoxTarget">
+        <property name="toolTip">
+         <string>Optional target advance: the Shift column shows how far each result is from it (3DSRNGTool's Shift/F), for calibrating after a miss</string>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="0" colspan="2">
        <widget class="QPushButton" name="pushButtonGenerate">
         <property name="text">
          <string>Generate</string>
@@ -291,6 +305,7 @@
   <tabstop>textBoxInitialAdvances</tabstop>
   <tabstop>textBoxMaxAdvances</tabstop>
   <tabstop>textBoxOffset</tabstop>
+  <tabstop>textBoxTarget</tabstop>
   <tabstop>pushButtonGenerate</tabstop>
   <tabstop>comboBoxCategory</tabstop>
   <tabstop>comboBoxPokemon</tabstop>

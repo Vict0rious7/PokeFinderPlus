@@ -42,19 +42,31 @@ QVariant StaticModel6::data(const QModelIndex &index, int role) const
         case 0:
             return state.getAdvances();
         case 1:
-            return QString::number(state.getEC(), 16).toUpper().rightJustified(8, '0');
+        {
+            // 3DSRNGTool's Real Time: advances at 60 per second
+            u64 ms = static_cast<u64>(state.getAdvances()) * 1000 / 60;
+            return QString("%1:%2.%3").arg(ms / 60000).arg(ms / 1000 % 60, 2, 10, QChar('0')).arg(ms % 1000, 3, 10, QChar('0'));
+        }
         case 2:
-            return QString::number(state.getPID(), 16).toUpper().rightJustified(8, '0');
+            if (target < 0)
+            {
+                return QString("-");
+            }
+            return QString("%1%2").arg(state.getAdvances() >= target ? "+" : "").arg(static_cast<s64>(state.getAdvances()) - target);
         case 3:
+            return QString::number(state.getEC(), 16).toUpper().rightJustified(8, '0');
+        case 4:
+            return QString::number(state.getPID(), 16).toUpper().rightJustified(8, '0');
+        case 5:
         {
             u8 shiny = state.getShiny();
             return shiny == 2 ? tr("Square") : shiny == 1 ? tr("Star") : tr("No");
         }
-        case 4:
-            return QString::fromStdString(Translator::getNature(state.getNature()));
-        case 5:
-            return state.getSync() ? tr("Yes") : tr("No");
         case 6:
+            return QString::fromStdString(Translator::getNature(state.getNature()));
+        case 7:
+            return state.getSync() ? tr("Yes") : tr("No");
+        case 8:
             if (state.getAbility() == 0 || state.getAbility() == 1)
             {
                 return QString("%1: %2")
@@ -62,16 +74,16 @@ QVariant StaticModel6::data(const QModelIndex &index, int role) const
                     .arg(QString::fromStdString(Translator::getAbility(state.getAbilityIndex())));
             }
             return QString("H (%1)").arg(QString::fromStdString(Translator::getAbility(state.getAbilityIndex())));
-        case 7:
-        case 8:
         case 9:
         case 10:
         case 11:
         case 12:
-            return showStats ? state.getStat(column - 7) : state.getIV(column - 7);
         case 13:
-            return QString::fromStdString(Translator::getHiddenPower(state.getHiddenPower()));
         case 14:
+            return showStats ? state.getStat(column - 9) : state.getIV(column - 9);
+        case 15:
+            return QString::fromStdString(Translator::getHiddenPower(state.getHiddenPower()));
+        case 16:
             return QString::fromStdString(Translator::getGender(state.getGender()));
         }
     }
@@ -90,5 +102,11 @@ QVariant StaticModel6::headerData(int section, Qt::Orientation orientation, int 
 void StaticModel6::setShowStats(bool flag)
 {
     showStats = flag;
-    emit dataChanged(index(0, 7), index(rowCount() - 1, 12), { Qt::DisplayRole });
+    emit dataChanged(index(0, 9), index(rowCount() - 1, 14), { Qt::DisplayRole });
+}
+
+void StaticModel6::setTarget(s64 target)
+{
+    this->target = target;
+    emit dataChanged(index(0, 2), index(rowCount() - 1, 2), { Qt::DisplayRole });
 }

@@ -46,10 +46,17 @@ public slots:
      */
     void setShowStats(bool flag);
 
+    /**
+     * @brief Target advance for the Shift column (advance - target, as 3DSRNGTool's Shift/F); -1 hides it
+     */
+    void setTarget(s64 target);
+
 private:
-    QStringList header = { tr("Advances"), tr("EC"),  tr("PID"), tr("Shiny"), tr("Nature"), tr("Sync"),         tr("Ability"), tr("HP"),
-                           tr("Atk"),      tr("Def"), tr("SpA"), tr("SpD"),   tr("Spe"),    tr("Hidden Power"), tr("Gender") };
+    QStringList header
+        = { tr("Advances"), tr("Time"), tr("Shift"), tr("EC"),  tr("PID"), tr("Shiny"), tr("Nature"),       tr("Sync"),  tr("Ability"),
+            tr("HP"),       tr("Atk"),  tr("Def"),   tr("SpA"), tr("SpD"), tr("Spe"),   tr("Hidden Power"), tr("Gender") };
     bool showStats;
+    s64 target = -1;
 };
 
 #endif // STATICMODEL6_HPP

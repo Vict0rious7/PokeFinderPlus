@@ -50,6 +50,7 @@ Static6::Static6(QWidget *parent) : QWidget(parent), ui(new Ui::Static6), shownV
     ui->textBoxInitialAdvances->setValues(InputType::Advance32Bit);
     ui->textBoxMaxAdvances->setValues(InputType::Advance32Bit);
     ui->textBoxOffset->setValues(InputType::Advance32Bit);
+    ui->textBoxTarget->setValues(InputType::Advance32Bit);
 
     ui->comboMenuLead->addAction(tr("None"), toInt(Lead::None));
     ui->comboMenuLead->addMenu(tr("Synchronize"), Translator::getNatures());
@@ -145,6 +146,7 @@ void Static6::generate()
                                *currentProfile, filter);
 
     auto states = generator.generate(seed);
+    model->setTarget(ui->textBoxTarget->text().isEmpty() ? -1 : static_cast<s64>(ui->textBoxTarget->getUInt()));
     model->addItems(states);
 }
 

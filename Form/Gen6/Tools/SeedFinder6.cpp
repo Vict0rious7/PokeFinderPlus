@@ -21,9 +21,11 @@
  */
 
 #include "SeedFinder6.hpp"
+#include <Core/Enum/Game.hpp>
 #include <Core/Gen6/Searchers/SeedSearcher6.hpp>
 #include <Form/Controls/TableView.hpp>
 #include <Form/Controls/TextBox.hpp>
+#include <Form/Util/IVCalculator.hpp>
 #include <Model/Gen6/SeedModel6.hpp>
 #include <QComboBox>
 #include <QFormLayout>
@@ -41,6 +43,7 @@
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <algorithm>
 
 namespace
 {
@@ -55,8 +58,8 @@ namespace
         return box;
     }
 
-    /// One row of 6 IV boxes with stat labels above
-    QWidget *ivRow(std::array<QSpinBox *, 6> &boxes, int value, const QString &name)
+    /// One row of 6 IV boxes with stat labels above, and an IV Calculator button when \p calculator is set
+    QWidget *ivRow(std::array<QSpinBox *, 6> &boxes, int value, const QString &name, QPushButton **calculator = nullptr)
     {
         auto *widget = new QWidget;
         auto *grid = new QGridLayout(widget);
@@ -67,6 +70,12 @@ namespace
             boxes[i] = spin(0, 31, value);
             boxes[i]->setObjectName(QString("%1%2").arg(name).arg(i));
             grid->addWidget(boxes[i], 1, i);
+        }
+        if (calculator)
+        {
+            *calculator = new QPushButton(QObject::tr("IV Calculator"));
+            (*calculator)->setObjectName(QString("pushButton%1Calculator").arg(name));
+            grid->addWidget(*calculator, 1, 6);
         }
         return widget;
     }
@@ -126,9 +135,11 @@ SeedFinder6::SeedFinder6(QWidget *parent) : QWidget(parent)
 
     auto *fullPage = new QGroupBox(tr("Pokemon received right after boot (exact IVs)"));
     auto *fullForm = new QFormLayout(fullPage);
-    fullForm->addRow(tr("Pokemon 1 IVs"), ivRow(ivs1, 0, "spinBoxIV1_"));
+    QPushButton *calculator1;
+    fullForm->addRow(tr("Pokemon 1 IVs"), ivRow(ivs1, 0, "spinBoxIV1_", &calculator1));
     fullForm->addRow(tr("Pokemon 1 frames"), range(frame1Min, frame1Max));
-    fullForm->addRow(tr("Pokemon 2 IVs"), ivRow(ivs2, 0, "spinBoxIV2_"));
+    QPushButton *calculator2;
+    fullForm->addRow(tr("Pokemon 2 IVs"), ivRow(ivs2, 0, "spinBoxIV2_", &calculator2));
     fullForm->addRow(tr("Pokemon 2 frames"), range(frame2Min, frame2Max));
     pages->addWidget(fullPage);
 
@@ -138,7 +149,8 @@ SeedFinder6::SeedFinder6(QWidget *parent) : QWidget(parent)
     baseSeed->setObjectName("textBoxBaseSeed");
     baseSeed->setValues(InputType::Seed32Bit);
     quickForm->addRow(tr("Base seed"), baseSeed);
-    quickForm->addRow(tr("Minimum IVs"), ivRow(ivMin, 0, "spinBoxIVMin"));
+    QPushButton *calculatorQuick;
+    quickForm->addRow(tr("Minimum IVs"), ivRow(ivMin, 0, "spinBoxIVMin", &calculatorQuick));
     quickForm->addRow(tr("Maximum IVs"), ivRow(ivMax, 31, "spinBoxIVMax"));
     quickForm->addRow(tr("Frames"), range(quickMin, quickMax));
     hours = spin(1, 71, 18);
@@ -176,6 +188,9 @@ SeedFinder6::SeedFinder6(QWidget *parent) : QWidget(parent)
     connect(game, &QComboBox::currentIndexChanged, this, &SeedFinder6::gameChanged);
     connect(full, &QRadioButton::toggled, this, [this](bool checked) { pages->setCurrentIndex(checked ? 0 : 1); });
     connect(search, &QPushButton::clicked, this, &SeedFinder6::startSearch);
+    connect(calculator1, &QPushButton::clicked, this, [this] { openCalculator(&ivs1, nullptr); });
+    connect(calculator2, &QPushButton::clicked, this, [this] { openCalculator(&ivs2, nullptr); });
+    connect(calculatorQuick, &QPushButton::clicked, this, [this] { openCalculator(&ivMin, &ivMax); });
 
     QSettings setting;
     game->setCurrentIndex(setting.value("seedFinder6/game", 0).toInt());
@@ -208,6 +223,37 @@ void SeedFinder6::gameChanged(int index)
     frame2Max->setValue(xy ? 1900 : 1700);
     quickMin->setValue(xy ? 750 : 600);
     quickMax->setValue(xy ? 900 : 800);
+}
+
+void SeedFinder6::openCalculator(std::array<QSpinBox *, 6> *exact, std::array<QSpinBox *, 6> *upper)
+{
+    // The fossils' IVs straight from their stats (Gen 6 base stats), as retailrng does with an online calculator
+    auto *calculator = new IVCalculator();
+    calculator->setGame(Game::Gen6);
+    connect(calculator, &IVCalculator::ivsCalculated, this, [this, exact, upper](std::array<std::vector<u8>, 6> ivs) {
+        if (std::ranges::any_of(ivs, [](const std::vector<u8> &values) { return values.empty(); }))
+        {
+            return; // some stat fits no IV: the calculator already says so, keep the boxes as they are
+        }
+        bool unique = true;
+        for (int i = 0; i < 6; i++)
+        {
+            unique &= ivs[i].size() == 1;
+            (*exact)[i]->setValue(ivs[i].front());
+            if (upper)
+            {
+                (*upper)[i]->setValue(ivs[i].back());
+            }
+        }
+        if (!upper && !unique)
+        {
+            QMessageBox msg(QMessageBox::Information, tr("IVs not exact yet"),
+                            tr("Some stats still allow several IVs (the lowest is filled in). The full search needs exact IVs: level the "
+                               "Pokemon up (Rare Candy), add a row with the new stats and find the IVs again."));
+            msg.exec();
+        }
+    });
+    calculator->show();
 }
 
 void SeedFinder6::startSearch()

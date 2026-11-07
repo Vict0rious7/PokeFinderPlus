@@ -65,6 +65,11 @@
         </item>
         <item>
          <property name="text">
+          <string>X/Y/Omega Ruby/Alpha Sapphire</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
           <string>Sword/Shield</string>
          </property>
         </item>

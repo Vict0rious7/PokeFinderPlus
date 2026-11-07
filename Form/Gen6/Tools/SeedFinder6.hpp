@@ -23,8 +23,10 @@
 #ifndef SEEDFINDER6_HPP
 #define SEEDFINDER6_HPP
 
+#include <Core/Global.hpp>
 #include <QWidget>
 #include <array>
+#include <vector>
 
 class QComboBox;
 class QProgressBar;
@@ -79,6 +81,11 @@ private slots:
     void gameChanged(int index);
 
     void startSearch();
+
+    /**
+     * @brief Opens the IV calculator on Gen 6; its result fills \p exact (lowest possible IVs), and \p upper with the highest if given
+     */
+    void openCalculator(std::array<QSpinBox *, 6> *exact, std::array<QSpinBox *, 6> *upper);
 };
 
 #endif // SEEDFINDER6_HPP

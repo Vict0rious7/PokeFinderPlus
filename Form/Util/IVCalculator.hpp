@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-07 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * setGame().
  */
 
 #ifndef IVCALCULATOR_HPP
@@ -22,6 +25,8 @@
 
 #include <Core/Global.hpp>
 #include <QWidget>
+
+enum class Game : u32;
 
 class QLabel;
 
@@ -59,6 +64,11 @@ public:
      * @brief Destroy the IVCalculator object
      */
     ~IVCalculator() override;
+
+    /**
+     * @brief PokeFinderPlus: selects the game (one of the game list's values, e.g. Game::Gen6)
+     */
+    void setGame(Game version);
 
 private:
     Ui::IVCalculator *ui;

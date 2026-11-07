@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-07 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * Gen 6 (XY, ORAS) in the game list; setGame().
  */
 
 #include "IVCalculator.hpp"
@@ -39,8 +42,8 @@ IVCalculator::IVCalculator(QWidget *parent) : QWidget(parent), ui(new Ui::IVCalc
 
     ui->comboBoxPokemon->enableAutoComplete();
 
-    ui->comboBoxGame->setup(
-        { toInt(Game::Gen3), toInt(Game::Platinum), toInt(Game::HGSS), toInt(Game::BW2), toInt(Game::SwSh), toInt(Game::BDSP) });
+    ui->comboBoxGame->setup({ toInt(Game::Gen3), toInt(Game::Platinum), toInt(Game::HGSS), toInt(Game::BW2), toInt(Game::Gen6),
+                              toInt(Game::SwSh), toInt(Game::BDSP) });
 
     ui->labelNextLevel->setToolTip(tr("Next level may not be completely accurate without specifying a nature"));
 
@@ -58,6 +61,16 @@ IVCalculator::IVCalculator(QWidget *parent) : QWidget(parent), ui(new Ui::IVCalc
     if (setting.contains("ivCalculator/geometry"))
     {
         this->restoreGeometry(setting.value("ivCalculator/geometry").toByteArray());
+    }
+}
+
+void IVCalculator::setGame(Game version)
+{
+    // PokeFinderPlus: lets a window open the calculator on its own game (e.g. the Gen 6 Seed Finder)
+    int index = ui->comboBoxGame->findData(toInt(version));
+    if (index != -1)
+    {
+        ui->comboBoxGame->setCurrentIndex(index);
     }
 }
 
@@ -257,6 +270,10 @@ void IVCalculator::gameIndexChanged(int index)
         else if ((version & Game::Gen5) != Game::None)
         {
             max = 649;
+        }
+        else if ((version & Game::Gen6) != Game::None) // PokeFinderPlus
+        {
+            max = 721;
         }
         else if ((version & Game::SwSh) != Game::None)
         {
