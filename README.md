@@ -1,3 +1,5 @@
+<p align="center"><img src="Form/Images/Icon/pokefinder_256x256.png" width="128" alt="PokeFinderPlus logo"></p>
+
 # PokéFinderPlus
 
 **Unofficial fork of [PokéFinder](https://github.com/Admiral-Fish/PokeFinder)** by Admiral-Fish and contributors, maintained by Vict0rious7.
@@ -7,12 +9,34 @@ Licensed under GPL-3.0, like PokéFinder (see `LICENSE`). Modified files say so 
 
 ## What's different from PokéFinder
 
-- **Gen 4 Seed to Time, "Today" checkbox (DPPt and HGSS).** Paste the seeds a searcher returned (one per line; whole copied rows work, the first value is used). Generate picks the seed you can still hit today without changing the console clock: earliest hour first, then the most tries left from the next minute, then the shortest delay. "Any / Even / Odd" restricts the delay parity. The table lists its remaining times; Calibrate works as usual. Uses the computer's clock. Unticked, Seed to Time is unchanged.
-- **Gen 3 Static and Wild searchers, FRLG initial seed columns.** For FireRed/LeafGreen profiles, each result shows the best reachable initial seed, its seed time (ms), advances, total time and settings, with Ten Lines' Teachy TV mode. Pick the game (only the profile's game: ENG, SPA/FRE/ITA/GER, JPN, mGBA, Switch), console and settings (or Any) above the tabs. This is a port of [Ten Lines](https://github.com/Lincoln-LM/ten-lines) by Lincoln-LM (GPL-3.0), with its seed tables: FRLG seeds farmed by blisy, po, HunarPG, 10Ben, Real96, ColdStoneSys, Papa Jefé, and トノ. Refresh the tables with `python3 Core/Resources/FRLG/pull_frlg_seeds.py`.
-- **Gen 3 Generator, FRLG calibration (as in Ten Lines' Calibration tab).** A **Seed ±** box next to the seed also generates from the neighbouring farmed seeds for the chosen game and settings (default 20), with Initial Seed and Seed Time columns. Right-click a searcher result → **Calibrate in Generator** fills the seed, advances window, settings and method.
-- **Gen 3 Static and Wild, "All methods" / "All wild methods"** in the Generator and the Searcher, with a Method column.
-- The macOS menu bar says PokeFinderPlus.
+**Gen 3**
+- **FRLG initial seeds in the Static and Wild searchers.** For FireRed/LeafGreen profiles, each result shows the best reachable initial seed, its seed time (ms), advances, total time and settings, with Ten Lines' Teachy TV mode. Pick the game (only the profile's game: ENG, SPA/FRE/ITA/GER, JPN, mGBA, Switch), console and settings (or Any) above the tabs. Results are sorted by shortest total time. This is a port of [Ten Lines](https://github.com/Lincoln-LM/ten-lines) by Lincoln-LM (GPL-3.0), with its seed tables: FRLG seeds farmed by blisy, po, HunarPG, 10Ben, Real96, ColdStoneSys, Papa Jefé, and トノ. Refresh the tables with `python3 Core/Resources/FRLG/pull_frlg_seeds.py`.
+- **FRLG calibration in the Generator (as in Ten Lines' Calibration tab).** A **Seed ±** box next to the seed also generates from the neighbouring farmed seeds for the chosen game and settings (default 20), with Initial Seed and Seed Time columns. Right-click a searcher result → **Calibrate in Generator** fills the seed, advances window, settings and method, then generates.
+- **"All methods" (Static) and "All wild methods" (Wild)** in the Generator and the Searcher, with a Method column.
+- **IV Calculator: Find IVs also fills the filters**: the nature, the level (lowest level entered, Wild) and the species (when the current location or category has it), not only the IVs.
+
+**Gen 4**
+- **Seed to Time, "Today" checkbox (DPPt and HGSS).** Paste the seeds a searcher returned (one per line; whole copied rows work, the first value is used). Generate picks the seed you can still hit today without changing the console clock: earliest hour first, then the most tries left from the next minute, then the shortest delay. "Any / Even / Odd" restricts the delay parity. The table lists its remaining times; Calibrate works as usual. Uses the computer's clock. Unticked, Seed to Time is unchanged.
+
+**App**
+- Its own logo (orange "+" in the magnifier), and the macOS app is **PokeFinderPlus.app** (Dock, Finder and menu bar). Settings keep the PokeFinder name, so your profiles carry over.
 - Window title, About box and update check point to this fork.
+
+## Download
+
+No release yet: builds of every push are on the [Actions page](https://github.com/Vict0rious7/PokeFinderPlus/actions) (open the latest green run → Artifacts, needs a GitHub login), or build it yourself.
+
+## Build on a Mac
+
+With [Homebrew](https://brew.sh) installed, from this folder:
+
+```sh
+./build-mac.sh           # installs Qt, CMake, Ninja and Python 3.14 if missing, builds, opens PokeFinderPlus.app
+./build-mac.sh --test    # same, and runs the tests first
+./build-mac.sh --clean   # start again from an empty build folder
+```
+
+Windows and Linux: see PokéFinder's Building section below (the app is called PokeFinder there).
 
 ---
 
