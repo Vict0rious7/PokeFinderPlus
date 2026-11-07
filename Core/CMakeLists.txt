@@ -229,6 +229,8 @@ add_library(PokeFinderCore STATIC
     Gen6/Generators/StaticGenerator6.hpp
     Gen6/Profile6.cpp
     Gen6/Profile6.hpp
+    Gen6/Searchers/SeedSearcher6.cpp
+    Gen6/Searchers/SeedSearcher6.hpp
     Gen6/StaticTemplate6.hpp
     Gen6/States/State6.hpp
     Gen8/Den.hpp

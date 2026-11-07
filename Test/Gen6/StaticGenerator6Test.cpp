@@ -53,7 +53,10 @@ namespace
     json golden()
     {
         QFile file(":/data/static6_3dsrngtool.json");
-        file.open(QIODevice::ReadOnly);
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            return json();
+        }
         return json::parse(file.readAll().toStdString());
     }
 }
