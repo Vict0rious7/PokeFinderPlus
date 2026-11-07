@@ -17,6 +17,8 @@
         <file alias="static4.json">Gen4/static4.json</file>
         <file alias="wild4.json">Gen4/wild4.json</file>
 
+        <file alias="static6_3dsrngtool.json">Gen6/static6_3dsrngtool.json</file> <!-- PokeFinderPlus -->
+
         <file alias="dreamradar.json">Gen5/dreamradar.json</file>
         <file alias="egg5.json">Gen5/egg5.json</file>
         <file alias="event5.json">Gen5/event5.json</file>

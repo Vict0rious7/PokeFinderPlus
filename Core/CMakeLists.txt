@@ -223,6 +223,14 @@ add_library(PokeFinderCore STATIC
     Gen5/StaticTemplate5.hpp
     Gen5/Tools/AdjacentSeedsCalculator.cpp
     Gen5/Tools/AdjacentSeedsCalculator.hpp
+    Gen6/Encounters6.cpp
+    Gen6/Encounters6.hpp
+    Gen6/Generators/StaticGenerator6.cpp
+    Gen6/Generators/StaticGenerator6.hpp
+    Gen6/Profile6.cpp
+    Gen6/Profile6.hpp
+    Gen6/StaticTemplate6.hpp
+    Gen6/States/State6.hpp
     Gen8/Den.hpp
     Gen8/EncounterArea8.cpp
     Gen8/EncounterArea8.hpp

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Path to 3DSRNGTool 1.0.6 source (github.com/wwwwwwzx/3DSRNGTool, tag 1.0.6): dotnet run -p:RngTool=/path/3DSRNGTool/3DSRNGTool -->
+    <RngTool Condition="'$(RngTool)' == ''">../../../../3DSRNGTool/3DSRNGTool</RngTool>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>CS0162;CS0168;CS0219;CS0414;CS0649;CS0169;CS8632</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(RngTool)/RNG/*.cs" />
+    <Compile Include="$(RngTool)/Core/*.cs" />
+    <Compile Include="$(RngTool)/Gen6/**/*.cs" />
+    <Compile Include="$(RngTool)/Gen7/**/*.cs" />
+    <Compile Include="$(RngTool)/Pokemon/*.cs" />
+    <Compile Include="$(RngTool)/Controls/Frame_Tiny.cs" />
+    <Compile Include="$(RngTool)/Util/FuncUtil.cs" />
+    <Compile Include="$(RngTool)/Controls/StringItem.cs" />
+    <Compile Include="$(RngTool)/Controls/ComboItem.cs" />
+    <Compile Include="Shim.cs" />
+    <Compile Include="Main.cs" />
+    <None Include="$(RngTool)/Resources/bytes/*" LinkBase="res" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
