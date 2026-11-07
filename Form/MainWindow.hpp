@@ -43,6 +43,7 @@ class Eggs8;
 class Event8;
 class IDs8;
 class Raids;
+class Static6; // PokeFinderPlus
 class Static8;
 class Wild8;
 class Underground;
@@ -79,6 +80,11 @@ signals:
      * @brief Emits that the profiles have been changed
      */
     void profilesChanged8();
+
+    /**
+     * @brief PokeFinderPlus: emits that the Gen 6 profiles have been changed
+     */
+    void profilesChanged6();
 
 public:
     /**
@@ -125,6 +131,7 @@ private:
     Event8 *event8 = nullptr;
     IDs8 *ids8 = nullptr;
     Raids *raids = nullptr;
+    Static6 *static6 = nullptr; // PokeFinderPlus
     Static8 *static8 = nullptr;
     Underground *underground = nullptr;
     Wild8 *wild8 = nullptr;
@@ -339,6 +346,16 @@ private slots:
     void openProfileManager8() const;
 
     /**
+     * @brief PokeFinderPlus: opens the Gen 6 profile manager
+     */
+    void openProfileManager6() const;
+
+    /**
+     * @brief PokeFinderPlus: opens the Gen 6 seed finder (IVs to initial seed)
+     */
+    void openSeedFinder6() const;
+
+    /**
      * @brief Opens the Gen 8 Raid window
      */
     void openRaids();
@@ -347,6 +364,11 @@ private slots:
      * @brief Opens the Gen 8 Static window
      */
     void openStatic8();
+
+    /**
+     * @brief PokeFinderPlus: opens the Gen 6 static window
+     */
+    void openStatic6();
 
     /**
      * @brief Opens the Gen 8 Underground window

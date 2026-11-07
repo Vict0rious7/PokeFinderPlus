@@ -56,6 +56,9 @@
 #include <Form/Gen5/Tools/Phenomenon.hpp>
 #include <Form/Gen5/Tools/SHA1CacheFinder.hpp>
 #include <Form/Gen5/Wild5.hpp>
+#include <Form/Gen6/Profile/ProfileManager6.hpp> // PokeFinderPlus
+#include <Form/Gen6/Static6.hpp> // PokeFinderPlus
+#include <Form/Gen6/Tools/SeedFinder6.hpp> // PokeFinderPlus
 #include <Form/Gen8/Eggs8.hpp>
 #include <Form/Gen8/Event8.hpp>
 #include <Form/Gen8/IDs8.hpp>
@@ -128,11 +131,14 @@ MainWindow::MainWindow(bool profile, QWidget *parent) : QMainWindow(parent), ui(
     connect(ui->pushButtonEvent8, &QPushButton::clicked, this, &MainWindow::openEvent8);
     connect(ui->pushButtonIDs8, &QPushButton::clicked, this, &MainWindow::openIDs8);
     connect(ui->pushButtonStatic8, &QPushButton::clicked, this, &MainWindow::openStatic8);
+    connect(ui->pushButtonStatic6, &QPushButton::clicked, this, &MainWindow::openStatic6); // PokeFinderPlus
+    connect(ui->pushButtonSeedFinder6, &QPushButton::clicked, this, &MainWindow::openSeedFinder6); // PokeFinderPlus
     connect(ui->pushButtonWild8, &QPushButton::clicked, this, &MainWindow::openWild8);
     connect(ui->pushButtonUnderground, &QPushButton::clicked, this, &MainWindow::openUnderground);
     connect(ui->pushButtonRaid, &QPushButton::clicked, this, &MainWindow::openRaids);
     connect(ui->actionDenMap, &QAction::triggered, this, &MainWindow::openDenMap);
     connect(ui->actionProfileManager8, &QAction::triggered, this, &MainWindow::openProfileManager8);
+    connect(ui->actionProfileManager6, &QAction::triggered, this, &MainWindow::openProfileManager6); // PokeFinderPlus
 
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::openAbout);
     connect(ui->actionEncounterLookup, &QAction::triggered, this, &MainWindow::openEncounterLookup);
@@ -689,6 +695,32 @@ void MainWindow::openIDs8()
     ids8->raise();
 }
 
+// PokeFinderPlus: Gen 6
+void MainWindow::openProfileManager6() const
+{
+    auto *manager = new ProfileManager6();
+    connect(manager, &ProfileManager6::profilesChanged, this, &MainWindow::updateProfiles);
+    manager->show();
+}
+
+void MainWindow::openSeedFinder6() const
+{
+    auto *window = new SeedFinder6();
+    window->show();
+}
+
+void MainWindow::openStatic6()
+{
+    if (!static6)
+    {
+        static6 = new Static6();
+        connect(static6, &Static6::profilesChanged, this, &MainWindow::updateProfiles);
+        connect(this, &MainWindow::profilesChanged6, static6, &Static6::updateProfiles);
+    }
+    static6->show();
+    static6->raise();
+}
+
 void MainWindow::openProfileManager8() const
 {
     auto *manager = new ProfileManager8();
@@ -806,6 +838,10 @@ void MainWindow::updateProfiles(int num)
     else if (num == 5)
     {
         emit profilesChanged5();
+    }
+    else if (num == 6) // PokeFinderPlus
+    {
+        emit profilesChanged6();
     }
     else if (num == 8)
     {
