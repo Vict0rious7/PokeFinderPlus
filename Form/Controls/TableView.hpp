@@ -86,6 +86,8 @@ private:
      * @brief Sets the current selected tableview region to the clipboard
      */
     void setSelectionToClipBoard();
+
+    bool resizePending = false; // PokeFinderPlus: a resize to contents is queued (see setModel)
 };
 
 #endif // TABLEVIEW_HPP

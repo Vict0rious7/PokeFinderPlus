@@ -52,9 +52,20 @@ TableView::TableView(QWidget *parent) : QTableView(parent)
 void TableView::setModel(QAbstractItemModel *model)
 {
     QTableView::setModel(model);
+    // PokeFinderPlus: resize once per batch of inserted rows, not once per row. A sorted proxy (FRLG searchers, sorted by total
+    // time) inserts each new result at its own place, so one batch emits one rowsInserted per result; resizing to contents each
+    // time measured the whole table again and again and froze the window ("not responding") a few seconds into the search.
     connect(this->model(), &QAbstractItemModel::rowsInserted, this, [this] {
-        QSettings setting;
-        this->horizontalHeader()->resizeSections(setting.value("settings/headerSize").value<QHeaderView::ResizeMode>());
+        if (resizePending)
+        {
+            return;
+        }
+        resizePending = true;
+        QTimer::singleShot(0, this, [this] {
+            resizePending = false;
+            QSettings setting;
+            this->horizontalHeader()->resizeSections(setting.value("settings/headerSize").value<QHeaderView::ResizeMode>());
+        });
     });
 }
 
