@@ -27,6 +27,7 @@
 #include <QMenu>
 #include <QSettings>
 #include <QTimer>
+#include <algorithm>
 
 TableView::TableView(QWidget *parent) : QTableView(parent)
 {
@@ -151,30 +152,25 @@ void TableView::resizeEvent(QResizeEvent *event)
 
 void TableView::setSelectionToClipBoard()
 {
+    // PokeFinderPlus: one pass over the selection. The loop used to call selectedIndexes() on every cell, which rebuilds the
+    // whole selection list each time: copying a whole column of 100,000 results took hours and looked like a crash.
     QModelIndexList indexes = this->selectionModel()->selectedIndexes();
     if (!indexes.isEmpty())
     {
+        // Selection ranges can come in any order (e.g. Shift+click upwards): copy in table order
+        std::sort(indexes.begin(), indexes.end(), [](const QModelIndex &left, const QModelIndex &right) {
+            return left.row() != right.row() ? left.row() < right.row() : left.column() < right.column();
+        });
+
         QString selectedText;
-
-        for (auto i = 0; i < indexes.size(); i++)
+        for (qsizetype i = 0; i < indexes.size(); i++)
         {
-            QModelIndex current = indexes[i];
-            QString text = current.data().toString();
-
-            if (i + 1 < selectedIndexes().count())
+            const QModelIndex &current = indexes[i];
+            selectedText += current.data().toString();
+            if (i + 1 < indexes.size())
             {
-                QModelIndex next = indexes[i + 1];
-
-                if (next.row() != current.row())
-                {
-                    text += "\n";
-                }
-                else
-                {
-                    text += "\t";
-                }
+                selectedText += indexes[i + 1].row() != current.row() ? QLatin1Char('\n') : QLatin1Char('\t');
             }
-            selectedText += text;
         }
 
         QApplication::clipboard()->setText(selectedText);
