@@ -18,13 +18,25 @@ Licensed under GPL-3.0, like PokéFinder (see `LICENSE`). Modified files say so 
 **Gen 4**
 - **Seed to Time, "Today" checkbox (DPPt and HGSS).** Paste the seeds a searcher returned (one per line; whole copied rows work, the first value is used). Generate picks the seed you can still hit today without changing the console clock: earliest hour first, then the most tries left from the next minute, then the shortest delay. "Any / Even / Odd" restricts the delay parity. The table lists its remaining times; Calibrate works as usual. Uses the computer's clock. Unticked, Seed to Time is unchanged.
 
+**Gen 6 (X / Y / Omega Ruby / Alpha Sapphire), new, not yet confirmed on hardware**
+- **Static** generator, checked against 3DSRNGTool: the game's categories and Pokémon, Delay filled from the Pokémon, Synchronize, Time column (60 advances per second) and an optional Target with a Shift column for calibrating after a miss.
+- **Seed Finder (IVs)**: initial seed from the IVs of two Pokémon (full search, port of poke6-seed-finder by ukikagi) or from one Pokémon after a known base seed (quick search, as in Lincoln-LM's Gen 6 GPU Tools), with XY / ORAS frame presets from retailrng's guides. An IV Calculator button fills the IVs.
+- **Gen 6 profiles** (TID, SID, Shiny Charm; TSV / TRV shown) in Gen 6 Tools → Profile Manager.
+
 **App**
 - Its own logo (orange "+" in the magnifier), and the macOS app is **PokeFinderPlus.app** (Dock, Finder and menu bar). Settings keep the PokeFinder name, so your profiles carry over.
-- Window title, About box and update check point to this fork.
+- Window title, About box and update check point to this fork. Version numbers are PokéFinder's base version + `-plus.N` (e.g. 4.4.2-plus.1).
+- On Windows the app is **PokeFinderPlus.exe**.
 
 ## Download
 
-No release yet: builds of every push are on the [Actions page](https://github.com/Vict0rious7/PokeFinderPlus/actions) (open the latest green run → Artifacts, needs a GitHub login), or build it yourself.
+Get the latest version on the [Releases page](https://github.com/Vict0rious7/PokeFinderPlus/releases/latest), under **Assets**:
+
+- **Windows 10 / 11 (64-bit):** `PokeFinderPlus-windows.zip`. Unzip it, open the `PokeFinderPlus` folder, run `PokeFinderPlus.exe`. The app isn't signed, so Windows may show "Windows protected your PC": click **More info → Run anyway**. Nothing to install; the Visual C++ runtime is included.
+- **macOS (Intel or Apple Silicon):** `PokeFinderPlus-macos.zip`. Unzip, move `PokeFinderPlus.app` to Applications, right-click → **Open** the first time (not notarised).
+- **Linux:** `PokeFinderPlus-linux-AppImage.tar.gz` (self-contained) or `PokeFinderPlus-linux.tar.gz` (needs Qt 6).
+
+The app checks for a new release once a day. Builds of every push are also on the [Actions page](https://github.com/Vict0rious7/PokeFinderPlus/actions) (needs a GitHub login).
 
 ## Build on a Mac
 
@@ -37,6 +49,8 @@ With [Homebrew](https://brew.sh) installed, from this folder:
 ```
 
 Windows and Linux: see PokéFinder's Building section below (the app is called PokeFinder there).
+
+To publish a release: bump `-plus.N` in `POKEFINDERPLUS_VERSION` (`CMakeLists.txt`), push to master, wait for a green CI, then push the tag `v` + that version (e.g. `v4.4.2-plus.1`). CI checks the tag matches, builds Windows, macOS and Linux, starts the packaged Windows app once to check the zip, and attaches everything to the release. Tags with `-beta` / `-rc` become pre-releases.
 
 ---
 

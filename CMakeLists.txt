@@ -6,6 +6,11 @@ endif()
 
 project(PokeFinder VERSION 4.4.2)
 
+# PokeFinderPlus: release version = PokéFinder base version + "-plus.N" (N = PokeFinderPlus release on that base).
+# Shown in the title and About box; the update check compares it with the latest release tag, and CI requires
+# the release tag to be "v" + this. Bump N for each release.
+set(POKEFINDERPLUS_VERSION "${PROJECT_VERSION}-plus.1")
+
 option(TEST "Run Tests" OFF)
 option(ENABLE_SIMD "Enable SIMD" ON)
 

@@ -19,6 +19,7 @@
  * Modified 2026-11-02 by Vict0rious7 for PokeFinderPlus (unofficial fork):
  * window title, About box and update check point to the fork; About credits the FRLG seed data.
  * 2026-11-07: Gen 6 tab (Static, Seed Finder) and Gen 6 profile manager.
+ * 2026-11-08: update check compares the whole release tag (versions like 4.4.2-plus.1).
  */
 
 #include "MainWindow.hpp"
@@ -211,8 +212,13 @@ void MainWindow::checkUpdates() const
     {
         auto json
             = QJsonDocument::fromJson(downloadFile("https://api.github.com/repos/Vict0rious7/PokeFinderPlus/releases/latest")).object();
-        QString webVersion = json["tag_name"].toString().right(5);
-        if (!webVersion.isEmpty() && POKEFINDER_VERSION != webVersion)
+        // PokeFinderPlus: compare the whole tag without its "v" (versions are like 4.4.2-plus.1, longer than 5 characters)
+        QString webVersion = json["tag_name"].toString();
+        if (webVersion.startsWith(u'v'))
+        {
+            webVersion.remove(0, 1);
+        }
+        if (!webVersion.isEmpty() && webVersion != QStringLiteral(POKEFINDER_VERSION))
         {
             QMessageBox msg(QMessageBox::Question, tr("Update Check"),
                             tr("An update is available. Would you like to download the newest version?"),

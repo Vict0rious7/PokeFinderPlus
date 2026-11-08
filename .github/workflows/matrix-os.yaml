@@ -1,5 +1,10 @@
 name: CI - Crossplatform
 
+# PokeFinderPlus: a tag vX.Y.Z-plus.N publishes a GitHub release with PokeFinderPlus-windows.zip,
+# PokeFinderPlus-macos.zip and the Linux builds (named like EonTimer's release assets).
+# The tag must be "v" + POKEFINDERPLUS_VERSION from CMakeLists.txt: the in-app update check compares the two.
+# Tags with -alpha / -beta / -rc are published as pre-releases (the update check ignores those).
+
 on:
   push:
     branches:
@@ -7,16 +12,19 @@ on:
       - "feature/**"
       - "today-seed-picker" # PokeFinderPlus: test builds of the fork's working branch
     tags:
-      - "v[0-9]+\\.[0-9]+\\.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+*"
   pull_request:
   workflow_dispatch: # PokeFinderPlus: build any branch from the Actions tab
+
+permissions:
+  contents: read
 
 jobs:
   ci:
     name: Build (${{ matrix.platform-name }})
     runs-on: ${{ matrix.os }}
-    env: ${{ matrix.env || fromJSON('{}') }} 
-    
+    env: ${{ matrix.env || fromJSON('{}') }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -97,26 +105,67 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             ${{ matrix.platform-name == 'macOS' && '-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"' || '' }}
 
+      # PokeFinderPlus: the app's version (generated version.h) must equal the tag without its "v".
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version=$(sed -n 's/^#define POKEFINDER_VERSION "\(.*\)".*/\1/p' build/Form/generated/Form/version.h)
+          echo "Tag $GITHUB_REF_NAME, app version $version"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the app version $version (POKEFINDERPLUS_VERSION in CMakeLists.txt). The update check would nag every user."
+            exit 1
+          fi
+
       - name: Build PokeFinder
         run: cmake --build build
 
       - name: Test PokeFinder
         run: ctest --test-dir build -V
 
+      # PokeFinderPlus: the zip must run on a PC without Qt or Visual Studio, so the Visual C++ runtime DLLs
+      # are copied next to the .exe (app-local, no vc_redist install). The .exe is renamed PokeFinderPlus.exe.
       - name: Package PokeFinder (Windows)
         if: matrix.platform-name == 'Windows'
+        shell: pwsh
         run: |
-          mkdir PokeFinder
-          mkdir PokeFinder/platforms
-          mkdir PokeFinder/styles
-          mv build/PokeFinder.exe PokeFinder/
-          windeployqt --no-translations --no-plugins --no-opengl-sw --no-system-d3d-compiler PokeFinder/PokeFinder.exe
-          rm -Force PokeFinder/vc_redist*.exe
-          cp "${{env.QT_ROOT_DIR}}/plugins/platforms/qwindows.dll" PokeFinder/platforms/
-          cp "${{env.QT_ROOT_DIR}}/plugins/styles/qmodernwindowsstyle.dll" PokeFinder/styles/
-          cp "${{env.QT_ROOT_DIR}}/../../Tools/OpenSSLv3/Win_x64/bin/lib*.dll" PokeFinder/
-          7z a PokeFinder-win.zip PokeFinder
-          mkdir upload && mv PokeFinder upload
+          New-Item -ItemType Directory PokeFinderPlus, PokeFinderPlus/platforms, PokeFinderPlus/styles | Out-Null
+          Move-Item build/PokeFinder.exe PokeFinderPlus/PokeFinderPlus.exe
+          windeployqt --release --no-translations --no-plugins --no-opengl-sw --no-system-d3d-compiler PokeFinderPlus/PokeFinderPlus.exe
+          Remove-Item PokeFinderPlus/vc_redist*.exe -ErrorAction SilentlyContinue
+          Copy-Item "$env:QT_ROOT_DIR/plugins/platforms/qwindows.dll" PokeFinderPlus/platforms/
+          Copy-Item "$env:QT_ROOT_DIR/plugins/styles/qmodernwindowsstyle.dll" PokeFinderPlus/styles/
+          Copy-Item "$env:QT_ROOT_DIR/../../Tools/OpenSSLv3/Win_x64/bin/lib*.dll" PokeFinderPlus/
+          $crt = Get-ChildItem "$env:VCToolsRedistDir\x64" -Directory -Filter 'Microsoft.VC*.CRT' | Select-Object -First 1
+          if (-not $crt) { Write-Error "Visual C++ runtime not found under $env:VCToolsRedistDir"; exit 1 }
+          Copy-Item "$($crt.FullName)\*.dll" PokeFinderPlus/
+          Copy-Item LICENSE PokeFinderPlus/LICENSE.txt
+          Get-ChildItem -Recurse PokeFinderPlus | Select-Object -ExpandProperty FullName
+          New-Item -ItemType Directory dist | Out-Null
+          Compress-Archive -Path PokeFinderPlus -DestinationPath dist/PokeFinderPlus-windows.zip
+
+      # PokeFinderPlus: start the packaged .exe the way a friend would: from the unzipped folder, with no Qt on PATH.
+      # POKEFINDERPLUS_SMOKE_TEST makes it save its window after start-up and quit; no screenshot = broken zip.
+      - name: Smoke test the zip (Windows)
+        if: matrix.platform-name == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive dist/PokeFinderPlus-windows.zip -DestinationPath smoke
+          $env:PATH = "$env:SystemRoot\system32;$env:SystemRoot"
+          $env:POKEFINDERPLUS_SMOKE_TEST = "$PWD\smoke-windows.png"
+          $p = Start-Process -FilePath smoke/PokeFinderPlus/PokeFinderPlus.exe -PassThru
+          $null = $p.Handle  # keeps ExitCode readable after WaitForExit
+          if (-not $p.WaitForExit(90000)) { $p.Kill(); Write-Error "PokeFinderPlus did not quit within 90 s"; exit 1 }
+          if ($p.ExitCode -ne 0) { Write-Error "PokeFinderPlus exited with code $($p.ExitCode)"; exit 1 }
+          if (-not (Test-Path smoke-windows.png)) { Write-Error "No screenshot: the window did not come up"; exit 1 }
+          Write-Host "Packaged app started and saved its window."
+
+      - name: Upload smoke-test screenshot (Windows)
+        if: matrix.platform-name == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: smoke-windows
+          path: smoke-windows.png
 
       - name: Package PokeFinder (Ubuntu)
         if: matrix.platform-name == 'Ubuntu'
@@ -124,7 +173,7 @@ jobs:
           wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod a+x linuxdeploy-*.AppImage
-          
+
           export QMAKE=$QT_ROOT_DIR/bin/qmake
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt \
             -e build/PokeFinder \
@@ -138,47 +187,66 @@ jobs:
           mkdir -p AppDir/usr/share/metainfo
           cp Form/io.github.admiral_fish.pokefinder.appdata.xml AppDir/usr/share/metainfo/
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          mv PokéFinder-x86_64.AppImage PokeFinder-x86_64.AppImage
-          
-          tar czf PokeFinder-linux.tar.gz -C ./build/ PokeFinder
-          tar czf PokeFinder-linux-AppImage.tar.gz PokeFinder-x86_64.AppImage
+          mv PokéFinder-x86_64.AppImage PokeFinderPlus-x86_64.AppImage
 
+          mkdir dist
+          tar czf dist/PokeFinderPlus-linux.tar.gz -C ./build/ PokeFinder
+          tar czf dist/PokeFinderPlus-linux-AppImage.tar.gz PokeFinderPlus-x86_64.AppImage
+
+      # PokeFinderPlus: ad-hoc signature so Apple Silicon Macs accept the bundle after macdeployqt changed it;
+      # ditto keeps the bundle's symlinks, which a plain zip would break.
       - name: Package PokeFinder (macOS)
         if: matrix.platform-name == 'macOS'
         run: |
           # PokeFinderPlus: the macOS bundle is PokeFinderPlus.app
           mv build/PokeFinderPlus.app .
           macdeployqt PokeFinderPlus.app -verbose=3
-          tar czf PokeFinder-macOS.tar.gz PokeFinderPlus.app
-          mkdir upload && mv PokeFinderPlus.app upload
+          codesign --force --deep --sign - PokeFinderPlus.app
+          mkdir dist
+          ditto -c -k --sequesterRsrc --keepParent PokeFinderPlus.app dist/PokeFinderPlus-macos.zip
 
-      - name: Upload Artifact (Windows / macOS)
-        if: matrix.platform-name != 'Ubuntu'
+      - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: PokeFinder-${{ matrix.platform-name }}
-          path: upload
+          name: PokeFinderPlus-${{ matrix.platform-name }}
+          path: dist
 
-      - name: Upload Artifact (Linux Binary)
-        if: matrix.platform-name == 'Ubuntu'
-        uses: actions/upload-artifact@v6
-        with:
-          name: PokeFinder-linux
-          path: ./build/PokeFinder
+  # PokeFinderPlus: one job publishes the release once all builds passed (three matrix jobs writing one release can race).
+  release:
+    name: Publish release
+    needs: ci
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
 
-      - name: Upload Artifact (Linux AppImage)
-        if: matrix.platform-name == 'Ubuntu'
-        uses: actions/upload-artifact@v6
+    steps:
+      - name: Download builds
+        uses: actions/download-artifact@v7
         with:
-          name: PokeFinder-linux-AppImage
-          path: PokeFinder-x86_64.AppImage
+          pattern: PokeFinderPlus-*
+          path: dist
+          merge-multiple: true
 
-      - name: Publish Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
         with:
+          name: PokéFinderPlus ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            PokeFinder-win.zip
-            PokeFinder-linux.tar.gz
-            PokeFinder-linux-AppImage.tar.gz
-            PokeFinder-macOS.tar.gz
+            dist/PokeFinderPlus-windows.zip
+            dist/PokeFinderPlus-macos.zip
+            dist/PokeFinderPlus-linux.tar.gz
+            dist/PokeFinderPlus-linux-AppImage.tar.gz
+          body: |
+            Unofficial fork of [PokéFinder](https://github.com/Admiral-Fish/PokeFinder). What it adds: see the [README](https://github.com/${{ github.repository }}#readme). Report bugs [here](https://github.com/${{ github.repository }}/issues), not to PokéFinder.
+
+            ## Download
+
+            - **Windows (10 or 11, 64-bit):** `PokeFinderPlus-windows.zip` below. Unzip it anywhere (not inside the zip view) and run `PokeFinderPlus.exe` in the `PokeFinderPlus` folder. Windows may say "Windows protected your PC" because the app isn't signed: click **More info → Run anyway**.
+            - **macOS (Intel or Apple Silicon):** `PokeFinderPlus-macos.zip` below. Unzip, move `PokeFinderPlus.app` to Applications, then right-click it → **Open** the first time (the app isn't notarised).
+            - **Linux:** `PokeFinderPlus-linux-AppImage.tar.gz` (self-contained) or `PokeFinderPlus-linux.tar.gz` (needs Qt 6 installed).
+
+            Settings and profiles are shared with PokéFinder, so existing profiles carry over.

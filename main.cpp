@@ -15,6 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Modified 2026-11-08 by Vict0rious7 for PokeFinderPlus (unofficial fork):
+ * POKEFINDERPLUS_SMOKE_TEST start-up check used by CI on the packaged app.
  */
 
 #include <Core/Parents/ProfileLoader.hpp>
@@ -27,6 +30,7 @@
 #include <QStandardPaths>
 #include <QStyleHints>
 #include <QThread>
+#include <QTimer>
 #include <QTranslator>
 
 /**
@@ -116,6 +120,17 @@ int main(int argc, char *argv[])
 
     MainWindow w(profile);
     w.show();
+
+    // PokeFinderPlus: CI smoke test of the packaged app. POKEFINDERPLUS_SMOKE_TEST=<path.png> saves the window
+    // after start-up and quits (also from inside a start-up message box).
+    const QString smokeShot = qEnvironmentVariable("POKEFINDERPLUS_SMOKE_TEST");
+    if (!smokeShot.isEmpty())
+    {
+        QTimer::singleShot(2500, &w, [&w, smokeShot] {
+            w.grab().save(smokeShot);
+            QApplication::quit();
+        });
+    }
 
     return a.exec();
 }
