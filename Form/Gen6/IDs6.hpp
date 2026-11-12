@@ -79,7 +79,7 @@ private:
 
     // IDs tab
     QLineEdit *state;
-    QLabel *tapLabel;
+    QLineEdit *firstTap;
     QSpinBox *idMin;
     QSpinBox *idMax;
     std::array<QCheckBox *, 4> filterOn;
@@ -95,7 +95,6 @@ private:
     qint64 lastTapMs = 0;
     bool recording = false;
     qint64 searchTapEpoch = 0; ///< first tap of the recording the last search used
-    qint64 stateTapEpoch = 0; ///< first tap that goes with the state in the IDs tab
     BlinkSearcher6 *running = nullptr;
 
     std::vector<u32> parseGaps(bool *ok) const;

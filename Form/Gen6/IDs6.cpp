@@ -78,16 +78,29 @@ namespace
         return widget;
     }
 
-    QLabel *note(const QString &text)
-    {
-        auto *label = new QLabel(text);
-        label->setWordWrap(true);
-        return label;
-    }
-
     QString clock(qint64 epochMs)
     {
         return QDateTime::fromMSecsSinceEpoch(epochMs).toString("HH:mm:ss.zzz");
+    }
+
+    /// Today's (or yesterday's, if later than now) time typed as HH:mm:ss.zzz, in ms since 1970; 0 if invalid
+    qint64 fromClock(const QString &text)
+    {
+        QTime time = QTime::fromString(text.trimmed(), "HH:mm:ss.zzz");
+        if (!time.isValid())
+        {
+            time = QTime::fromString(text.trimmed(), "HH:mm:ss");
+        }
+        if (!time.isValid())
+        {
+            return 0;
+        }
+        QDateTime when(QDate::currentDate(), time);
+        if (when > QDateTime::currentDateTime())
+        {
+            when = when.addDays(-1);
+        }
+        return when.toMSecsSinceEpoch();
     }
 }
 
@@ -126,17 +139,12 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     tapStatus->setObjectName("labelTapStatus");
     gaps = new QPlainTextEdit;
     gaps->setObjectName("plainTextEditGaps");
-    gaps->setPlaceholderText(tr("Frames between blinks, one per line (filled by the taps; can be typed or pasted)"));
+    gaps->setPlaceholderText(tr("Frames between blinks"));
     gaps->setMaximumWidth(220);
-    gaps->setToolTip(tr("Space types here while this box has the focus: click elsewhere in the window to tap with Space again."));
     tapsLayout->addWidget(blink, 0, 0, 1, 2);
     tapsLayout->addWidget(clear, 1, 0);
     tapsLayout->addWidget(tapStatus, 1, 1);
     tapsLayout->addWidget(gaps, 0, 2, 3, 1);
-    tapsLayout->addWidget(note(tr("Delete the save (B + X + Y + Up on the title screen), play the intro until the professor's face "
-                                  "shows, then tap Blink (or Space) each time he blinks, about 10 times. Leave the game on that "
-                                  "screen.")),
-                          2, 0, 1, 2);
     seedLayout->addWidget(taps);
 
     auto *settings = new QGroupBox(tr("Search"));
@@ -147,8 +155,8 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     auto *modes = new QWidget;
     auto *modeRow = new QHBoxLayout(modes);
     modeRow->setContentsMargins(0, 0, 0, 0);
-    all = new QRadioButton(tr("All seeds (first time: minutes)"));
-    near = new QRadioButton(tr("Near a base seed (after a reset: seconds)"));
+    all = new QRadioButton(tr("All seeds"));
+    near = new QRadioButton(tr("Near base seed"));
     near->setObjectName("radioButtonNear");
     all->setChecked(true);
     modeRow->addWidget(all);
@@ -163,7 +171,6 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     baseSeed->setValues(InputType::Seed32Bit);
     hours = spin(1, 1193, 18, "spinBoxHours");
     hours->setSuffix(tr(" h"));
-    hours->setToolTip(tr("Seeds from the base seed on, one per millisecond of boot time"));
     baseLayout->addWidget(baseSeed);
     baseLayout->addWidget(new QLabel(tr("up to")));
     baseLayout->addWidget(hours);
@@ -189,8 +196,6 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     seedTable->setObjectName("tableViewSeeds");
     seedTable->setModel(seedModel);
     seedLayout->addWidget(seedTable, 1);
-    seedLayout->addWidget(note(tr("Double-click a seed to list its IDs. To confirm it, soft reset, tap again and search near it "
-                                  "(the base seed is filled in for you).")));
     tabs->addTab(seedPage, tr("1. Seed from blinks"));
 
     // ---- IDs ----
@@ -200,14 +205,13 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     auto *idForm = new QFormLayout(idSettings);
     state = new QLineEdit;
     state->setObjectName("lineEditState");
-    state->setPlaceholderText(tr("4 words, as in the seed table"));
     idForm->addRow(tr("State at first tap"), state);
-    tapLabel = new QLabel(tr("No first tap time: the timer can't place the blinks"));
-    tapLabel->setObjectName("labelTap");
-    idForm->addRow(tr("First tap"), tapLabel);
+    firstTap = new QLineEdit;
+    firstTap->setObjectName("lineEditFirstTap");
+    firstTap->setPlaceholderText(tr("HH:mm:ss.zzz"));
+    idForm->addRow(tr("First tap"), firstTap);
     idMin = spin(0, 1000000, 0, "spinBoxIDMin");
     idMax = spin(0, 1000000, 5000, "spinBoxIDMax");
-    idMax->setToolTip(tr("Advances come one per blink of a character: 5000 can be more than an hour"));
     idForm->addRow(tr("Advances"), range(idMin, idMax));
     auto *filters = new QWidget;
     auto *filterRow = new QHBoxLayout(filters);
@@ -246,22 +250,15 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     sendRow->addWidget(copy);
     sendRow->addStretch();
     idLayout->addLayout(sendRow);
-    idLayout->addWidget(note(tr("Pick the ID you want (double-click sends it) and play on in PokeTimerPlus (3DS → XY TID): it beeps "
-                                "with the blinks and gives the exact wait after the 4th step. Advances keep moving while you choose: "
-                                "pick one a few minutes ahead.")));
     tabs->addTab(idPage, tr("2. IDs"));
-
-    layout->addWidget(note(tr("Method and timeline values: BZL's 6genTidSearch (なるほどえたきちのブログじゃねーの), "
-                              "blog.bzl-web.com/entry/2020/08/31/202306.")));
 
     auto *space = new QShortcut(QKeySequence(Qt::Key_Space), this);
     connect(space, &QShortcut::activated, this, &IDs6::tap);
     connect(blink, &QPushButton::pressed, this, &IDs6::tap); // on press, not release: closer to the blink
     connect(clear, &QPushButton::clicked, this, &IDs6::clearTaps);
     connect(search, &QPushButton::clicked, this, &IDs6::startSearch);
-    connect(seedTable, &QAbstractItemView::doubleClicked, this, &IDs6::useSeed);
+    connect(seedTable->selectionModel(), &QItemSelectionModel::currentRowChanged, this, &IDs6::useSeed);
     connect(generate, &QPushButton::clicked, this, &IDs6::generateIDs);
-    connect(idTable, &QAbstractItemView::doubleClicked, this, &IDs6::sendToTimer);
     connect(send, &QPushButton::clicked, this, &IDs6::sendToTimer);
     connect(copy, &QPushButton::clicked, this, &IDs6::copyForTimer);
 
@@ -299,7 +296,7 @@ void IDs6::tap()
         tapEpoch = QDateTime::currentMSecsSinceEpoch();
         lastTapMs = 0;
         recording = true;
-        tapStatus->setText(tr("First tap at %1").arg(clock(tapEpoch)));
+        tapStatus->setText(tr("0 gaps"));
         return;
     }
     // Same rounding as 6genTidSearch: whole ms, then frames truncated
@@ -308,7 +305,7 @@ void IDs6::tap()
     lastTapMs = now;
     gaps->appendPlainText(QString::number(frames));
     int count = gaps->toPlainText().split('\n', Qt::SkipEmptyParts).size();
-    tapStatus->setText(tr("First tap at %1, %2 gaps").arg(clock(tapEpoch)).arg(count));
+    tapStatus->setText(tr("%1 gaps").arg(count));
 }
 
 void IDs6::clearTaps()
@@ -347,15 +344,13 @@ void IDs6::startSearch()
     std::vector<u32> list = parseGaps(&ok);
     if (!ok || list.empty())
     {
-        QMessageBox msg(QMessageBox::Warning, tr("No blinks"),
-                        tr("Tap Blink at each blink first (or type the gaps, one number per line)."));
+        QMessageBox msg(QMessageBox::Warning, tr("No blinks"), tr("No gaps to search."));
         msg.exec();
         return;
     }
     if (list.size() < 5)
     {
-        QMessageBox msg(QMessageBox::Question, tr("Few blinks"),
-                        tr("Only %1 gaps: many seeds will match. 6genTidSearch's guide uses about 10. Search anyway?").arg(list.size()),
+        QMessageBox msg(QMessageBox::Question, tr("Few blinks"), tr("Only %1 gaps: many seeds may match. Search anyway?").arg(list.size()),
                         QMessageBox::Yes | QMessageBox::No);
         if (msg.exec() != QMessageBox::Yes)
         {
@@ -375,7 +370,7 @@ void IDs6::startSearch()
     if (!searcher->startSearch(threads, list, advanceMin->value(), advanceMax->value(), base, count, nearBase))
     {
         delete searcher;
-        QMessageBox msg(QMessageBox::Warning, tr("Invalid settings"), tr("Check the advance range (minimum <= maximum)."));
+        QMessageBox msg(QMessageBox::Warning, tr("Invalid settings"), tr("Advance minimum is above maximum."));
         msg.exec();
         return;
     }
@@ -417,11 +412,8 @@ void IDs6::useSeed(const QModelIndex &index)
     }
     const BlinkResult6 &result = seedModel->getItem(index.row());
     state->setText(seedModel->data(seedModel->index(index.row(), 2), Qt::DisplayRole).toString());
-    stateTapEpoch = searchTapEpoch;
-    tapLabel->setText(stateTapEpoch ? clock(stateTapEpoch) : tr("No first tap time: the timer can't place the blinks"));
-    // Next reset: search from this seed
-    baseSeed->setText(QString::number(result.seed, 16).toUpper().rightJustified(8, '0'));
-    tabs->setCurrentIndex(1);
+    firstTap->setText(searchTapEpoch ? clock(searchTapEpoch) : QString());
+    baseSeed->setText(QString::number(result.seed, 16).toUpper().rightJustified(8, '0')); // next reset: search near it
     generateIDs();
 }
 
@@ -449,7 +441,7 @@ void IDs6::generateIDs()
     std::array<u32, 4> words;
     if (!parseState(words))
     {
-        QMessageBox msg(QMessageBox::Warning, tr("No state"), tr("Double-click a seed in the first tab, or type its 4 state words."));
+        QMessageBox msg(QMessageBox::Warning, tr("No state"), tr("State: 4 hex words."));
         msg.exec();
         return;
     }
@@ -484,22 +476,21 @@ QString IDs6::handoffText(bool *ok)
     std::array<u32, 4> words;
     if (!parseState(words))
     {
-        QMessageBox msg(QMessageBox::Warning, tr("No state"), tr("Double-click a seed in the first tab first."));
+        QMessageBox msg(QMessageBox::Warning, tr("No state"), tr("State: 4 hex words."));
         msg.exec();
         return {};
     }
-    if (stateTapEpoch == 0)
+    qint64 tap = fromClock(firstTap->text());
+    if (tap == 0)
     {
-        QMessageBox msg(QMessageBox::Warning, tr("No first tap time"),
-                        tr("This state didn't come from taps made here, so PokeTimerPlus can't tell where the blinks are. Tap the "
-                           "blinks and search again."));
+        QMessageBox msg(QMessageBox::Warning, tr("No first tap"), tr("First tap: HH:mm:ss.zzz."));
         msg.exec();
         return {};
     }
     XYTid::Handoff handoff;
     handoff.game = game->currentIndex() == 0 ? 'X' : 'Y';
     handoff.state = words;
-    handoff.tapEpochMs = stateTapEpoch;
+    handoff.tapEpochMs = tap;
     QModelIndexList selected = idTable->selectionModel()->selectedRows();
     if (selected.isEmpty() && idTable->currentIndex().isValid())
     {
@@ -541,11 +532,10 @@ void IDs6::sendToTimer()
         return;
     }
     QApplication::clipboard()->setText(text);
-    QString why = reply == "BUSY" ? tr("PokeTimerPlus is running another timer: stop it and send again.")
-        : reply.isEmpty()         ? tr("PokeTimerPlus isn't open (or is too old for XY TID).")
-                                  : tr("PokeTimerPlus didn't accept the details.");
-    QMessageBox msg(QMessageBox::Information, tr("Not sent"),
-                    why + "\n\n" + tr("The details are on the clipboard: in PokeTimerPlus, 3DS tab → XY TID, press Paste."));
+    QString why = reply == "BUSY" ? tr("PokeTimerPlus is running another timer.")
+        : reply.isEmpty()         ? tr("PokeTimerPlus isn't open.")
+                                  : tr("PokeTimerPlus refused the details.");
+    QMessageBox msg(QMessageBox::Information, tr("Not sent"), why + " " + tr("Copied to the clipboard instead."));
     msg.exec();
 }
 
