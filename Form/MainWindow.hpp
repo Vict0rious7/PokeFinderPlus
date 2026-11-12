@@ -354,6 +354,11 @@ private slots:
     void openProfileManager6() const;
 
     /**
+     * @brief PokeFinderPlus: opens the XY IDs window (blinks to seed, IDs, handoff to PokeTimerPlus)
+     */
+    void openIDs6() const;
+
+    /**
      * @brief PokeFinderPlus: opens the Gen 6 seed finder (IVs to initial seed)
      */
     void openSeedFinder6() const;

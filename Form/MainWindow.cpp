@@ -20,6 +20,7 @@
  * window title, About box and update check point to the fork; About credits the FRLG seed data.
  * 2026-11-07: Gen 6 tab (Static, Seed Finder) and Gen 6 profile manager.
  * 2026-11-08: update check compares the whole release tag (versions like 4.4.2-plus.1).
+ * 2026-11-12: Gen 6 IDs (X / Y) window.
  */
 
 #include "MainWindow.hpp"
@@ -58,6 +59,7 @@
 #include <Form/Gen5/Tools/Phenomenon.hpp>
 #include <Form/Gen5/Tools/SHA1CacheFinder.hpp>
 #include <Form/Gen5/Wild5.hpp>
+#include <Form/Gen6/IDs6.hpp> // PokeFinderPlus
 #include <Form/Gen6/Profile/ProfileManager6.hpp> // PokeFinderPlus
 #include <Form/Gen6/Static6.hpp> // PokeFinderPlus
 #include <Form/Gen6/Tools/SeedFinder6.hpp> // PokeFinderPlus
@@ -135,6 +137,7 @@ MainWindow::MainWindow(bool profile, QWidget *parent) : QMainWindow(parent), ui(
     connect(ui->pushButtonStatic8, &QPushButton::clicked, this, &MainWindow::openStatic8);
     connect(ui->pushButtonStatic6, &QPushButton::clicked, this, &MainWindow::openStatic6); // PokeFinderPlus
     connect(ui->pushButtonSeedFinder6, &QPushButton::clicked, this, &MainWindow::openSeedFinder6); // PokeFinderPlus
+    connect(ui->pushButtonIDs6, &QPushButton::clicked, this, &MainWindow::openIDs6); // PokeFinderPlus
     connect(ui->pushButtonWild8, &QPushButton::clicked, this, &MainWindow::openWild8);
     connect(ui->pushButtonUnderground, &QPushButton::clicked, this, &MainWindow::openUnderground);
     connect(ui->pushButtonRaid, &QPushButton::clicked, this, &MainWindow::openRaids);
@@ -708,6 +711,12 @@ void MainWindow::openProfileManager6() const
     auto *manager = new ProfileManager6();
     connect(manager, &ProfileManager6::profilesChanged, this, &MainWindow::updateProfiles);
     manager->show();
+}
+
+void MainWindow::openIDs6() const
+{
+    auto *window = new IDs6();
+    window->show();
 }
 
 void MainWindow::openSeedFinder6() const

@@ -22,6 +22,7 @@ Licensed under GPL-3.0, like PokéFinder (see `LICENSE`). Modified files say so 
 - **Static** generator, checked against 3DSRNGTool: the game's categories and Pokémon, Delay filled from the Pokémon, Synchronize, Time column (60 advances per second) and an optional Target with a Shift column for calibrating after a miss.
 - **Seed Finder (IVs)**: initial seed from the IVs of two Pokémon (full search, port of poke6-seed-finder by ukikagi) or from one Pokémon after a known base seed (quick search, as in Lincoln-LM's Gen 6 GPU Tools), with XY / ORAS frame presets from retailrng's guides. An IV Calculator button fills the IVs.
 - **Gen 6 profiles** (TID, SID, Shiny Charm; TSV / TRV shown) in Gen 6 Tools → Profile Manager.
+- **IDs (X / Y)**: choose your Trainer ID and Secret ID on real hardware, with the method of BZL's 6genTidSearch. Tap Blink (or Space) at each of the professor's blinks; the search finds the initial seed (all seeds the first time, seconds near the base seed after a reset); double-click it to list the TID / SID / TSV / TRV of every advance, with filters. **Send to PokeTimerPlus** hands the pick to PokeTimerPlus (3DS → XY TID), which beeps on the blinks and times the A press; **Copy for PokeTimerPlus** does the same through the clipboard. Checked against 6genTidSearch's own code (`Test/Gen6/golden6tid`). Method and timeline values by BZL ([なるほどえたきちのブログじゃねーの](https://blog.bzl-web.com/entry/2020/08/31/202306)), used with his permission.
 
 **App**
 - Its own logo (orange "+" in the magnifier), and the macOS app is **PokeFinderPlus.app** (Dock, Finder and menu bar). Settings keep the PokeFinder name, so your profiles carry over.
@@ -193,3 +194,4 @@ Linux
 - The PokemonRNG team for various contributions and research [zaksabeast](https://github.com/zaksabeast), [EzPzstreamz](https://github.com/SteveCookTU), [Shiny_Sylveon](https://github.com/ShinySylveon04), [Vlad](https://github.com/RichardPaulAstley), [Real96](https://github.com/Real96)
 - Other great people for various help and research ([OmegaDonut](https://github.com/OmegaDonut), [Bond697](https://github.com/Bond697), [Kaphotics](https://github.com/kwsch), [SciresM](https://github.com/SciresM), Zari, amab, Marin, [Lean](https://github.com/Leanny), etc)
 - Sans for initial GUI design
+- PokeFinderPlus: BZL (なるほどえたきちのブログじゃねーの) for 6genTidSearch: the XY / ORAS ID method and timeline values, used with his permission ([XY guide](https://blog.bzl-web.com/entry/2020/08/31/202306), [ORAS guide](https://blog.bzl-web.com/entry/2020/08/24/225424))

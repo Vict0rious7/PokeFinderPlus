@@ -222,6 +222,8 @@ set(PROJECT_SOURCES
     Gen5/Tools/SHA1CacheFinder.hpp
     Gen5/Wild5.cpp
     Gen5/Wild5.hpp
+    Gen6/IDs6.cpp
+    Gen6/IDs6.hpp
     Gen6/Profile/ProfileDisplay6.cpp
     Gen6/Profile/ProfileDisplay6.hpp
     Gen6/Profile/ProfileEditor6.cpp
