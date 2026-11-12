@@ -20,6 +20,7 @@
  */
 
 #include "BlinkModel6.hpp"
+#include <QDateTime>
 
 namespace
 {
@@ -35,7 +36,7 @@ BlinkModel6::BlinkModel6(QObject *parent) : TableModel(parent)
 
 int BlinkModel6::columnCount(const QModelIndex &parent) const
 {
-    return near ? 4 : 3;
+    return near ? 5 : 4;
 }
 
 QVariant BlinkModel6::data(const QModelIndex &index, int role) const
@@ -52,6 +53,8 @@ QVariant BlinkModel6::data(const QModelIndex &index, int role) const
         case 2:
             return QString("%1,%2,%3,%4").arg(hex(result.state[3]), hex(result.state[2]), hex(result.state[1]), hex(result.state[0]));
         case 3:
+            return firstTap ? QDateTime::fromMSecsSinceEpoch(firstTap).toString("HH:mm:ss.zzz") : QString();
+        case 4:
         {
             u32 ms = result.seed - base;
             return QString("%1:%2:%3.%4")
@@ -78,10 +81,19 @@ QVariant BlinkModel6::headerData(int section, Qt::Orientation orientation, int r
         case 2:
             return tr("State at first tap");
         case 3:
+            return tr("First tap");
+        case 4:
             return tr("Time since base seed");
         }
     }
     return QVariant();
+}
+
+void BlinkModel6::setFirstTap(qint64 epochMs)
+{
+    beginResetModel();
+    firstTap = epochMs;
+    endResetModel();
 }
 
 void BlinkModel6::setNear(bool near, u32 base)

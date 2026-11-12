@@ -42,7 +42,13 @@ public:
      */
     void setNear(bool near, u32 base);
 
+    /**
+     * @brief Time of the first tap of the blinks searched (ms since 1970, 0 = none), shown in every row
+     */
+    void setFirstTap(qint64 epochMs);
+
 private:
+    qint64 firstTap = 0;
     u32 base = 0;
     bool near = false;
 };

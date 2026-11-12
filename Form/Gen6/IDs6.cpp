@@ -378,6 +378,7 @@ void IDs6::startSearch()
     running = searcher;
     seedModel->clearModel();
     seedModel->setNear(nearBase, base);
+    seedModel->setFirstTap(searchTapEpoch);
     search->setEnabled(false);
     cancel->setEnabled(true);
     progress->setValue(0);
