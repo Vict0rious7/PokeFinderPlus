@@ -25,16 +25,14 @@
 #include <Core/Gen6/Searchers/BlinkSearcher6.hpp>
 #include <Core/Gen6/Searchers/OrasSearcher6.hpp>
 #include <Core/Gen6/XYTid.hpp>
+#include <Form/Controls/IDsFilter.hpp>
 #include <Form/Controls/TableView.hpp>
 #include <Form/Controls/TextBox.hpp>
 #include <Model/Gen6/BlinkModel6.hpp>
 #include <Model/Gen6/IDModel6.hpp>
 #include <QApplication>
-#include <QCheckBox>
 #include <QClipboard>
-#include <QComboBox>
 #include <QDateTime>
-#include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -51,8 +49,6 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QShortcut>
-#include <QSpinBox>
-#include <QStackedWidget>
 #include <QStandardItemModel>
 #include <QTabWidget>
 #include <QTableWidget>
@@ -65,25 +61,13 @@
 
 namespace
 {
-    QSpinBox *spin(int min, int max, int value, const QString &name)
+    TextBox *textBox(InputType type, const QString &text, const QString &name)
     {
-        auto *box = new QSpinBox;
-        box->setRange(min, max);
-        box->setValue(value);
+        auto *box = new TextBox;
+        box->setValues(type);
+        box->setText(text);
         box->setObjectName(name);
         return box;
-    }
-
-    QWidget *range(QSpinBox *min, QSpinBox *max)
-    {
-        auto *widget = new QWidget;
-        auto *row = new QHBoxLayout(widget);
-        row->setContentsMargins(0, 0, 0, 0);
-        row->addWidget(min);
-        row->addWidget(new QLabel(QObject::tr("to")));
-        row->addWidget(max);
-        row->addStretch();
-        return widget;
     }
 
     QString clock(qint64 epochMs)
@@ -116,141 +100,127 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_QuitOnClose, false);
     setAttribute(Qt::WA_DeleteOnClose);
-    setWindowTitle(tr("IDs (XY / ORAS)"));
+    setWindowTitle(tr("Gen 6 TID/SID"));
 
     auto *layout = new QVBoxLayout(this);
-    auto *top = new QFormLayout;
-    game = new QComboBox;
-    game->addItems({ tr("X"), tr("Y"), tr("Omega Ruby"), tr("Alpha Sapphire") });
-    game->setObjectName("comboBoxGame");
-    top->addRow(tr("Game"), game);
-    layout->addLayout(top);
+    games = new QTabWidget;
+    games->setObjectName("tabWidgetGames");
+    layout->addWidget(games);
 
-    pages = new QStackedWidget;
-    layout->addWidget(pages, 1);
-    tabs = new QTabWidget;
-    pages->addWidget(tabs);
+    // ======== X/Y ========
+    auto *xyPage = new QWidget;
+    xyPage->setObjectName("tabXY");
+    xyPage->setFocusPolicy(Qt::ClickFocus); // a click on the page takes Space back from the text fields
+    auto *xyLayout = new QGridLayout(xyPage);
 
-    // ---- Seed (blinks) ----
-    auto *seedPage = new QWidget;
-    seedPage->setObjectName("seedPage");
-    seedPage->setFocusPolicy(Qt::ClickFocus); // a click on the page takes Space back from the text fields
-    auto *seedLayout = new QVBoxLayout(seedPage);
-
-    auto *taps = new QGroupBox(tr("Professor's blinks"));
-    auto *tapsLayout = new QGridLayout(taps);
-    blink = new QPushButton(tr("Blink  (Space)"));
+    // ---- Seed Finder: the professor's blinks ----
+    auto *seedFinder = new QGroupBox(tr("Seed Finder"));
+    auto *seedFinderLayout = new QVBoxLayout(seedFinder);
+    auto *seedTop = new QHBoxLayout;
+    auto *blinkInfo = new QGroupBox(tr("RNG Info"));
+    auto *blinkForm = new QGridLayout(blinkInfo);
+    blink = new QPushButton(tr("Blink (Space)"));
     blink->setObjectName("pushButtonBlink");
-    blink->setMinimumHeight(48);
     blink->setFocusPolicy(Qt::NoFocus);
     clear = new QPushButton(tr("Clear"));
     clear->setFocusPolicy(Qt::NoFocus);
     tapStatus = new QLabel(tr("No taps yet"));
     tapStatus->setObjectName("labelTapStatus");
-    gaps = new QPlainTextEdit;
-    gaps->setObjectName("plainTextEditGaps");
-    gaps->setPlaceholderText(tr("Frames between blinks"));
-    gaps->setMaximumWidth(220);
-    tapsLayout->addWidget(blink, 0, 0, 1, 2);
-    tapsLayout->addWidget(clear, 1, 0);
-    tapsLayout->addWidget(tapStatus, 1, 1);
-    tapsLayout->addWidget(gaps, 0, 2, 3, 1);
-    seedLayout->addWidget(taps);
-
-    auto *settings = new QGroupBox(tr("Search"));
-    auto *form = new QFormLayout(settings);
-    advanceMin = spin(0, 10000, XYTid::DEFAULT_ADVANCE_MIN, "spinBoxAdvanceMin");
-    advanceMax = spin(0, 10000, XYTid::DEFAULT_ADVANCE_MAX, "spinBoxAdvanceMax");
-    form->addRow(tr("First blink's advance"), range(advanceMin, advanceMax));
-    auto *modes = new QWidget;
-    auto *modeRow = new QHBoxLayout(modes);
-    modeRow->setContentsMargins(0, 0, 0, 0);
-    all = new QRadioButton(tr("All seeds"));
-    near = new QRadioButton(tr("Near base seed"));
+    advanceMin = textBox(InputType::Advance32Bit, QString::number(XYTid::DEFAULT_ADVANCE_MIN), "textBoxAdvanceMin");
+    advanceMax = textBox(InputType::Advance32Bit, QString::number(XYTid::DEFAULT_ADVANCE_MAX), "textBoxAdvanceMax");
+    all = new QRadioButton(tr("All Seeds"));
+    near = new QRadioButton(tr("Near Base Seed"));
     near->setObjectName("radioButtonNear");
     all->setChecked(true);
-    modeRow->addWidget(all);
-    modeRow->addWidget(near);
-    modeRow->addStretch();
-    form->addRow(tr("Seeds"), modes);
-    auto *baseRow = new QWidget;
-    auto *baseLayout = new QHBoxLayout(baseRow);
-    baseLayout->setContentsMargins(0, 0, 0, 0);
     baseSeed = new TextBox;
     baseSeed->setObjectName("textBoxBaseSeed");
     baseSeed->setValues(InputType::Seed32Bit);
-    hours = spin(1, 1193, 18, "spinBoxHours");
-    hours->setSuffix(tr(" h"));
-    baseLayout->addWidget(baseSeed);
-    baseLayout->addWidget(new QLabel(tr("up to")));
-    baseLayout->addWidget(hours);
-    baseLayout->addStretch();
-    form->addRow(tr("Base seed"), baseRow);
-    seedLayout->addWidget(settings);
-
+    hours = new TextBox;
+    hours->setObjectName("textBoxHours");
+    hours->setValues(1, 1193, 4, 10);
+    hours->setText("18");
+    blinkForm->addWidget(blink, 0, 0, 1, 2);
+    blinkForm->addWidget(clear, 1, 0);
+    blinkForm->addWidget(tapStatus, 1, 1);
+    blinkForm->addWidget(new QLabel(tr("Min Blink Advance")), 2, 0);
+    blinkForm->addWidget(advanceMin, 2, 1);
+    blinkForm->addWidget(new QLabel(tr("Max Blink Advance")), 3, 0);
+    blinkForm->addWidget(advanceMax, 3, 1);
+    blinkForm->addWidget(all, 4, 0);
+    blinkForm->addWidget(near, 4, 1);
+    blinkForm->addWidget(new QLabel(tr("Base Seed")), 5, 0);
+    blinkForm->addWidget(baseSeed, 5, 1);
+    blinkForm->addWidget(new QLabel(tr("Max Hours")), 6, 0);
+    blinkForm->addWidget(hours, 6, 1);
+    auto *gapsBox = new QGroupBox(tr("Blink Gaps"));
+    auto *gapsLayout = new QVBoxLayout(gapsBox);
+    gaps = new QPlainTextEdit;
+    gaps->setObjectName("plainTextEditGaps");
+    gaps->setPlaceholderText(tr("Frames between blinks"));
+    gapsLayout->addWidget(gaps);
+    seedTop->addWidget(blinkInfo);
+    seedTop->addWidget(gapsBox);
+    seedFinderLayout->addLayout(seedTop);
     auto *buttons = new QHBoxLayout;
     search = new QPushButton(tr("Search"));
     search->setObjectName("pushButtonSearch");
     cancel = new QPushButton(tr("Cancel"));
     cancel->setEnabled(false);
+    buttons->addWidget(search);
+    buttons->addWidget(cancel);
+    seedFinderLayout->addLayout(buttons);
     progress = new QProgressBar;
     progress->setRange(0, 100);
     progress->setValue(0);
-    buttons->addWidget(search);
-    buttons->addWidget(cancel);
-    buttons->addWidget(progress, 1);
-    seedLayout->addLayout(buttons);
+    seedFinderLayout->addWidget(progress);
+    xyLayout->addWidget(seedFinder, 0, 0);
 
     seedModel = new BlinkModel6(this);
     seedTable = new TableView;
     seedTable->setObjectName("tableViewSeeds");
     seedTable->setModel(seedModel);
-    seedLayout->addWidget(seedTable, 1);
-    tabs->addTab(seedPage, tr("1. Seed from blinks"));
+    xyLayout->addWidget(seedTable, 1, 0);
 
-    // ---- IDs ----
-    auto *idPage = new QWidget;
-    auto *idLayout = new QVBoxLayout(idPage);
-    auto *idSettings = new QGroupBox(tr("IDs"));
-    auto *idForm = new QFormLayout(idSettings);
+    // ---- Generator: IDs from the state at the first tap ----
+    auto *generator = new QGroupBox(tr("Generator"));
+    auto *generatorLayout = new QHBoxLayout(generator);
+    auto *idInfo = new QGroupBox(tr("RNG Info"));
+    auto *idForm = new QGridLayout(idInfo);
     state = new QLineEdit;
     state->setObjectName("lineEditState");
-    idForm->addRow(tr("State at first tap"), state);
+    state->setMinimumWidth(280); // 4 hex words
     firstTap = new QLineEdit;
     firstTap->setObjectName("lineEditFirstTap");
     firstTap->setPlaceholderText(tr("HH:mm:ss.zzz"));
-    idForm->addRow(tr("First tap"), firstTap);
-    idMin = spin(0, 1000000, 0, "spinBoxIDMin");
-    idMax = spin(0, 1000000, 5000, "spinBoxIDMax");
-    idForm->addRow(tr("Advances"), range(idMin, idMax));
-    auto *filters = new QWidget;
-    auto *filterRow = new QHBoxLayout(filters);
-    filterRow->setContentsMargins(0, 0, 0, 0);
-    const QStringList names = { tr("TID"), tr("SID"), tr("TSV"), tr("TRV") };
-    const int maxima[] = { 65535, 65535, 4095, 15 };
-    for (int i = 0; i < 4; i++)
-    {
-        filterOn[i] = new QCheckBox(names[i]);
-        filterOn[i]->setObjectName("checkBox" + names[i]);
-        filterValue[i] = spin(0, maxima[i], 0, "spinBox" + names[i]);
-        filterValue[i]->setEnabled(false);
-        connect(filterOn[i], &QCheckBox::toggled, filterValue[i], &QSpinBox::setEnabled);
-        filterRow->addWidget(filterOn[i]);
-        filterRow->addWidget(filterValue[i]);
-    }
-    filterRow->addStretch();
-    idForm->addRow(tr("Filters"), filters);
+    firstTap->setMinimumWidth(110);
+    idMin = textBox(InputType::Advance32Bit, "0", "textBoxIDMin");
+    idMax = textBox(InputType::Advance32Bit, "5000", "textBoxIDMax");
     generate = new QPushButton(tr("Generate"));
     generate->setObjectName("pushButtonGenerate");
-    idForm->addRow(generate);
-    idLayout->addWidget(idSettings);
+    idForm->addWidget(new QLabel(tr("State")), 0, 0);
+    idForm->addWidget(state, 0, 1);
+    idForm->addWidget(new QLabel(tr("First Tap")), 1, 0);
+    idForm->addWidget(firstTap, 1, 1);
+    idForm->addWidget(new QLabel(tr("Initial Advances")), 2, 0);
+    idForm->addWidget(idMin, 2, 1);
+    idForm->addWidget(new QLabel(tr("Max Advances")), 3, 0);
+    idForm->addWidget(idMax, 3, 1);
+    idForm->addWidget(generate, 4, 0, 1, 2);
+    auto *filterBox = new QGroupBox(tr("Filters"));
+    auto *filterLayout = new QVBoxLayout(filterBox);
+    filter = new IDsFilter;
+    filter->setObjectName("idFilter");
+    filterLayout->addWidget(filter);
+    generatorLayout->addWidget(idInfo);
+    generatorLayout->addWidget(filterBox);
+    xyLayout->addWidget(generator, 0, 1);
 
+    auto *idSide = new QVBoxLayout;
     idModel = new IDModel6(this);
     idTable = new TableView;
     idTable->setObjectName("tableViewIDs");
     idTable->setModel(idModel);
-    idLayout->addWidget(idTable, 1);
-
+    idSide->addWidget(idTable);
     auto *sendRow = new QHBoxLayout;
     send = new QPushButton(tr("Send to PokeTimerPlus"));
     send->setObjectName("pushButtonSend");
@@ -258,24 +228,27 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     copy->setObjectName("pushButtonCopy");
     sendRow->addWidget(send);
     sendRow->addWidget(copy);
-    sendRow->addStretch();
-    idLayout->addLayout(sendRow);
-    tabs->addTab(idPage, tr("2. IDs"));
+    idSide->addLayout(sendRow);
+    xyLayout->addLayout(idSide, 1, 1);
+    xyLayout->setRowStretch(1, 1);
+    xyLayout->setColumnStretch(0, 1);
+    xyLayout->setColumnStretch(1, 1);
+    games->addTab(xyPage, tr("X/Y"));
 
-    // ---- ORAS: seed from launches ----
-    orasTabs = new QTabWidget;
-    orasTabs->setObjectName("tabWidgetOras");
-    pages->addWidget(orasTabs);
-    auto *launchPage = new QWidget;
-    launchPage->setObjectName("launchPage");
-    launchPage->setFocusPolicy(Qt::ClickFocus);
-    auto *launchLayout = new QVBoxLayout(launchPage);
+    // ======== OR/AS ========
+    auto *orasPage = new QWidget;
+    orasPage->setObjectName("tabORAS");
+    orasPage->setFocusPolicy(Qt::ClickFocus);
+    auto *orasLayout = new QGridLayout(orasPage);
 
-    auto *launchBox = new QGroupBox(tr("New games"));
-    auto *launchGrid = new QGridLayout(launchBox);
-    launch = new QPushButton(tr("Launch  (Space)"));
+    // ---- Seed Finder: new games launched at known times ----
+    auto *launchFinder = new QGroupBox(tr("Seed Finder"));
+    auto *launchFinderLayout = new QVBoxLayout(launchFinder);
+    auto *launchTop = new QHBoxLayout;
+    auto *launchInfo = new QGroupBox(tr("RNG Info"));
+    auto *launchForm = new QGridLayout(launchInfo);
+    launch = new QPushButton(tr("Launch (Space)"));
     launch->setObjectName("pushButtonLaunch");
-    launch->setMinimumHeight(48);
     launch->setFocusPolicy(Qt::NoFocus);
     removeLaunch = new QPushButton(tr("Remove"));
     removeLaunch->setFocusPolicy(Qt::NoFocus);
@@ -283,82 +256,88 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     clearLaunches->setFocusPolicy(Qt::NoFocus);
     launchStatus = new QLabel;
     launchStatus->setObjectName("labelLaunchStatus");
+    tolerance = textBox(InputType::Delay, QString::number(OrasTid::DEFAULT_TOLERANCE), "textBoxTolerance");
+    tolerance->setValues(0, 60000, 5, 10);
+    launchForm->addWidget(launch, 0, 0, 1, 2);
+    launchForm->addWidget(removeLaunch, 1, 0);
+    launchForm->addWidget(clearLaunches, 1, 1);
+    launchForm->addWidget(launchStatus, 2, 0, 1, 2);
+    launchForm->addWidget(new QLabel(tr("Tolerance (ms)")), 3, 0);
+    launchForm->addWidget(tolerance, 3, 1);
+    launchForm->setRowStretch(4, 1);
+    auto *launchBox = new QGroupBox(tr("Launches"));
+    auto *launchBoxLayout = new QVBoxLayout(launchBox);
     launches = new QTableWidget(0, 2);
     launches->setObjectName("tableWidgetLaunches");
-    launches->setHorizontalHeaderLabels({ tr("Launch (ms)"), tr("TID") });
+    launches->setHorizontalHeaderLabels({ tr("Time (ms)"), tr("TID") });
     launches->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     launches->setFocusPolicy(Qt::ClickFocus);
-    launches->setMaximumWidth(300);
-    launchGrid->addWidget(launch, 0, 0, 1, 2);
-    launchGrid->addWidget(removeLaunch, 1, 0);
-    launchGrid->addWidget(clearLaunches, 1, 1);
-    launchGrid->addWidget(launchStatus, 2, 0, 1, 2);
-    launchGrid->setRowStretch(3, 1);
-    launchGrid->addWidget(launches, 0, 2, 4, 1);
-    launchLayout->addWidget(launchBox);
-
-    auto *orasSettings = new QGroupBox(tr("Search"));
-    auto *orasForm = new QFormLayout(orasSettings);
-    tolerance = spin(0, 60000, OrasTid::DEFAULT_TOLERANCE, "spinBoxTolerance");
-    tolerance->setPrefix(tr("± "));
-    tolerance->setSuffix(tr(" ms"));
-    orasForm->addRow(tr("Tolerance"), tolerance);
-    launchLayout->addWidget(orasSettings);
-
+    launchBoxLayout->addWidget(launches);
+    launchTop->addWidget(launchInfo);
+    launchTop->addWidget(launchBox);
+    launchFinderLayout->addLayout(launchTop);
     auto *orasButtons = new QHBoxLayout;
     orasSearch = new QPushButton(tr("Search"));
     orasSearch->setObjectName("pushButtonOrasSearch");
     orasCancel = new QPushButton(tr("Cancel"));
     orasCancel->setEnabled(false);
+    orasButtons->addWidget(orasSearch);
+    orasButtons->addWidget(orasCancel);
+    launchFinderLayout->addLayout(orasButtons);
     orasProgress = new QProgressBar;
     orasProgress->setRange(0, 100);
     orasProgress->setValue(0);
-    orasButtons->addWidget(orasSearch);
-    orasButtons->addWidget(orasCancel);
-    orasButtons->addWidget(orasProgress, 1);
-    launchLayout->addLayout(orasButtons);
+    launchFinderLayout->addWidget(orasProgress);
+    orasLayout->addWidget(launchFinder, 0, 0);
 
     baseModel = new QStandardItemModel(this);
+    baseModel->setHorizontalHeaderLabels({ tr("Base Seed") });
     baseTable = new TableView;
     baseTable->setObjectName("tableViewBaseSeeds");
     baseTable->setModel(baseModel);
     baseTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     baseTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    launchLayout->addWidget(baseTable, 1);
-    orasTabs->addTab(launchPage, tr("1. Seed from launches"));
+    orasLayout->addWidget(baseTable, 1, 0);
 
-    // ---- ORAS: SID / TSV of a launch ----
-    auto *identPage = new QWidget;
-    auto *identLayout = new QVBoxLayout(identPage);
-    auto *identBox = new QGroupBox(tr("Launch"));
-    auto *identForm = new QFormLayout(identBox);
+    // ---- SID Finder: the new game kept ----
+    auto *sidFinder = new QGroupBox(tr("SID Finder"));
+    auto *sidForm = new QGridLayout(sidFinder);
     orasBase = new TextBox;
     orasBase->setObjectName("textBoxOrasBase");
     orasBase->setValues(InputType::Seed32Bit);
-    identForm->addRow(tr("Base seed"), orasBase);
-    orasLaunchMs = spin(0, std::numeric_limits<int>::max(), 0, "spinBoxOrasLaunch");
-    orasLaunchMs->setSuffix(tr(" ms"));
-    identForm->addRow(tr("Launch"), orasLaunchMs);
-    orasTid = spin(0, 65535, 0, "spinBoxOrasTID");
-    identForm->addRow(tr("TID"), orasTid);
-    orasNo = spin(0, 100000, 0, "spinBoxOrasNo");
-    identForm->addRow(tr("\"No\" at the name"), orasNo);
-    orasTolerance = spin(0, 60000, OrasTid::DEFAULT_TOLERANCE, "spinBoxOrasTolerance");
-    orasTolerance->setPrefix(tr("± "));
-    orasTolerance->setSuffix(tr(" ms"));
-    identForm->addRow(tr("Tolerance"), orasTolerance);
+    orasLaunchMs = textBox(InputType::Seed32Bit, "0", "textBoxOrasLaunch");
+    orasLaunchMs->setValues(0, 0x7fffffff, 10, 10);
+    orasTid = textBox(InputType::TIDSID, "", "textBoxOrasTID");
+    orasNo = textBox(InputType::Advance32Bit, "0", "textBoxOrasNo");
+    orasTolerance = textBox(InputType::Delay, QString::number(OrasTid::DEFAULT_TOLERANCE), "textBoxOrasTolerance");
+    orasTolerance->setValues(0, 60000, 5, 10);
     identify = new QPushButton(tr("Find"));
     identify->setObjectName("pushButtonIdentify");
-    identForm->addRow(identify);
-    identLayout->addWidget(identBox);
+    sidForm->addWidget(new QLabel(tr("Base Seed")), 0, 0);
+    sidForm->addWidget(orasBase, 0, 1);
+    sidForm->addWidget(new QLabel(tr("Launch Time (ms)")), 1, 0);
+    sidForm->addWidget(orasLaunchMs, 1, 1);
+    sidForm->addWidget(new QLabel(tr("TID Obtained")), 2, 0);
+    sidForm->addWidget(orasTid, 2, 1);
+    sidForm->addWidget(new QLabel(tr("Name \"No\" Count")), 3, 0);
+    sidForm->addWidget(orasNo, 3, 1);
+    sidForm->addWidget(new QLabel(tr("Tolerance (ms)")), 4, 0);
+    sidForm->addWidget(orasTolerance, 4, 1);
+    sidForm->addWidget(identify, 5, 0, 1, 2);
+    sidForm->setRowStretch(6, 1);
+    orasLayout->addWidget(sidFinder, 0, 1);
 
     identModel = new QStandardItemModel(this);
+    identModel->setHorizontalHeaderLabels({ tr("Seed"), tr("Offset (ms)"), tr("TID"), tr("SID"), tr("TSV"), tr("TRV") });
     identTable = new TableView;
     identTable->setObjectName("tableViewIdentified");
     identTable->setModel(identModel);
     identTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    identLayout->addWidget(identTable, 1);
-    orasTabs->addTab(identPage, tr("2. SID / TSV"));
+    orasLayout->addWidget(identTable, 1, 1);
+    orasLayout->setRowStretch(1, 1);
+    orasLayout->setColumnStretch(0, 1);
+    orasLayout->setColumnStretch(1, 1);
+    games->addTab(orasPage, tr("OR/AS"));
 
     auto *space = new QShortcut(QKeySequence(Qt::Key_Space), this);
     connect(space, &QShortcut::activated, this, &IDs6::tap);
@@ -372,38 +351,17 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     connect(launch, &QPushButton::pressed, this, &IDs6::addLaunch); // on press, together with A
     connect(removeLaunch, &QPushButton::clicked, this, &IDs6::removeLaunchRow);
     connect(clearLaunches, &QPushButton::clicked, this, &IDs6::clearLaunchList);
-    connect(launches, &QTableWidget::itemChanged, this, &IDs6::saveLaunches);
+    connect(launches, &QTableWidget::itemChanged, this, [this] {
+        saveLaunches();
+        fillFromLastLaunch();
+    });
     connect(orasSearch, &QPushButton::clicked, this, &IDs6::startOrasSearch);
     connect(baseTable->selectionModel(), &QItemSelectionModel::currentRowChanged, this, &IDs6::useBaseSeed);
     connect(identify, &QPushButton::clicked, this, &IDs6::identifyLaunch);
-    connect(orasTabs, &QTabWidget::currentChanged, this, [this](int index) {
-        // The SID / TSV tab starts from the latest launch with a TID (the new game to keep is launched last)
-        if (index != 1)
-        {
-            return;
-        }
-        for (int row = launches->rowCount() - 1; row >= 0; row--)
-        {
-            QTableWidgetItem *t = launches->item(row, 1);
-            if (t && !t->text().trimmed().isEmpty())
-            {
-                QTableWidgetItem *m = launches->item(row, 0);
-                orasLaunchMs->setValue(m ? m->text().toInt() : 0);
-                orasTid->setValue(t->text().toInt());
-                break;
-            }
-        }
-        if (!orasBase->text().isEmpty())
-        {
-            identifyLaunch();
-        }
-    });
-    connect(game, &QComboBox::currentIndexChanged, this, [this](int index) { pages->setCurrentIndex(index >= 2 ? 1 : 0); });
 
     QSettings setting;
-    game->setCurrentIndex(setting.value("ids6/game", 0).toInt());
-    pages->setCurrentIndex(isOras() ? 1 : 0);
-    tolerance->setValue(setting.value("ids6/orasTolerance", OrasTid::DEFAULT_TOLERANCE).toInt());
+    games->setCurrentIndex(setting.value("ids6/tab", 0).toInt());
+    tolerance->setText(QString::number(setting.value("ids6/orasTolerance", OrasTid::DEFAULT_TOLERANCE).toInt()));
     launchEpoch = setting.value("ids6/orasLaunchEpoch", 0).toLongLong();
     {
         QSignalBlocker block(launches);
@@ -421,22 +379,21 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
         launchEpoch = 0;
     }
     launchStatus->setText(launchEpoch ? tr("First launch at %1").arg(clock(launchEpoch)) : tr("No launch yet"));
-    if (setting.contains("ids6/geometry"))
+    fillFromLastLaunch();
+    resize(1150, 650);
+    if (setting.contains("ids6/geometryTabs"))
     {
-        restoreGeometry(setting.value("ids6/geometry").toByteArray());
+        restoreGeometry(setting.value("ids6/geometryTabs").toByteArray());
     }
-    seedPage->setFocus(); // Space taps (a focused text field would take it)
-    if (isOras())
-    {
-        launchPage->setFocus();
-    }
-    // Space adds a launch even while a TID is being typed in the table (the cell's editor would take it otherwise)
+    games->currentWidget()->setFocus(); // Space taps (a focused text field would take it)
     qApp->installEventFilter(this);
+    connect(games, &QTabWidget::currentChanged, this, [this] { games->currentWidget()->setFocus(); });
 }
 
 bool IDs6::eventFilter(QObject *object, QEvent *event)
 {
-    if (event->type() == QEvent::ShortcutOverride && isActiveWindow() && isOras() && orasTabs->currentIndex() == 0)
+    // OR/AS: Space always adds a launch, even while a TID or a number is being typed (no field there takes a space)
+    if (event->type() == QEvent::ShortcutOverride && isOras() && isAncestorOf(QApplication::focusWidget()))
     {
         auto *key = static_cast<QKeyEvent *>(event);
         if (key->key() == Qt::Key_Space && key->modifiers() == Qt::NoModifier)
@@ -461,23 +418,16 @@ IDs6::~IDs6()
         delete orasRunning;
     }
     QSettings setting;
-    setting.setValue("ids6/orasTolerance", tolerance->value());
-    setting.setValue("ids6/game", game->currentIndex());
-    setting.setValue("ids6/geometry", saveGeometry());
+    setting.setValue("ids6/orasTolerance", tolerance->getUInt());
+    setting.setValue("ids6/tab", games->currentIndex());
+    setting.setValue("ids6/geometryTabs", saveGeometry());
 }
 
 void IDs6::tap()
 {
     if (isOras())
     {
-        if (orasTabs->currentIndex() == 0)
-        {
-            addLaunch();
-        }
-        return;
-    }
-    if (tabs->currentIndex() != 0)
-    {
+        addLaunch();
         return;
     }
     if (!recording)
@@ -556,9 +506,9 @@ void IDs6::startSearch()
     int threads = setting.value("settings/threads", QThread::idealThreadCount()).toInt();
     bool nearBase = near->isChecked();
     u32 base = baseSeed->getUInt();
-    u32 count = static_cast<u32>(std::min<u64>(static_cast<u64>(hours->value()) * 3600000, 0xffffffffull));
+    u32 count = static_cast<u32>(std::min<u64>(static_cast<u64>(hours->getUInt()) * 3600000, 0xffffffffull));
     auto *searcher = new BlinkSearcher6();
-    if (!searcher->startSearch(threads, list, advanceMin->value(), advanceMax->value(), base, count, nearBase))
+    if (!searcher->startSearch(threads, list, advanceMin->getUInt(), advanceMax->getUInt(), base, count, nearBase))
     {
         delete searcher;
         QMessageBox msg(QMessageBox::Warning, tr("Invalid settings"), tr("Advance minimum is above maximum."));
@@ -637,29 +587,12 @@ void IDs6::generateIDs()
         msg.exec();
         return;
     }
-    if (idMin->value() > idMax->value())
+    if (idMin->getUInt() > idMax->getUInt())
     {
         return;
     }
-    IDFilter6 filter;
-    if (filterOn[0]->isChecked())
-    {
-        filter.tid = filterValue[0]->value();
-    }
-    if (filterOn[1]->isChecked())
-    {
-        filter.sid = filterValue[1]->value();
-    }
-    if (filterOn[2]->isChecked())
-    {
-        filter.tsv = filterValue[2]->value();
-    }
-    if (filterOn[3]->isChecked())
-    {
-        filter.trv = filterValue[3]->value();
-    }
     idModel->clearModel();
-    idModel->addItems(generateIDs6(words, idMin->value(), idMax->value(), filter));
+    idModel->addItems(generateIDs6(words, idMin->getUInt(), idMax->getUInt(), filter->getFilter(false)));
 }
 
 QString IDs6::handoffText(bool *ok)
@@ -680,7 +613,6 @@ QString IDs6::handoffText(bool *ok)
         return {};
     }
     XYTid::Handoff handoff;
-    handoff.game = game->currentIndex() == 0 ? 'X' : 'Y';
     handoff.state = words;
     handoff.tapEpochMs = tap;
     QModelIndexList selected = idTable->selectionModel()->selectedRows();
@@ -743,7 +675,7 @@ void IDs6::copyForTimer()
 
 bool IDs6::isOras() const
 {
-    return game->currentIndex() >= 2;
+    return games->currentIndex() == 1;
 }
 
 void IDs6::saveLaunches() const
@@ -764,9 +696,9 @@ void IDs6::addLaunch()
 {
     // Wall clock, so a launch list survives closing the window (the first launch's time is saved)
     qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (launches->isAncestorOf(QApplication::focusWidget()))
+    if (games->currentWidget()->isAncestorOf(QApplication::focusWidget()))
     {
-        orasTabs->widget(0)->setFocus(); // commits the TID being typed
+        games->currentWidget()->setFocus(); // commits the TID being typed
     }
     if (launches->rowCount() == 0 || launchEpoch == 0)
     {
@@ -867,7 +799,7 @@ void IDs6::startOrasSearch()
     QSettings setting;
     int threads = setting.value("settings/threads", QThread::idealThreadCount()).toInt();
     auto *searcher = new OrasSearcher6();
-    if (!searcher->startSearch(threads, list, tolerance->value()))
+    if (!searcher->startSearch(threads, list, tolerance->getUInt()))
     {
         delete searcher;
         return;
@@ -875,13 +807,13 @@ void IDs6::startOrasSearch()
 
     orasRunning = searcher;
     baseModel->clear();
-    QStringList headers { tr("Base seed") };
+    QStringList headers { tr("Base Seed") };
     for (size_t i = 0; i < list.size(); i++)
     {
         headers.append(tr("Launch %1").arg(i + 1));
     }
     baseModel->setHorizontalHeaderLabels(headers);
-    orasTolerance->setValue(tolerance->value());
+    orasTolerance->setText(tolerance->text());
     orasSearch->setEnabled(false);
     orasCancel->setEnabled(true);
     orasProgress->setValue(0);
@@ -935,6 +867,11 @@ void IDs6::useBaseSeed(const QModelIndex &index)
         return;
     }
     orasBase->setText(baseModel->item(index.row(), 0)->text());
+    fillFromLastLaunch();
+    if (!orasTid->text().isEmpty())
+    {
+        identifyLaunch();
+    }
 }
 
 void IDs6::identifyLaunch()
@@ -945,8 +882,14 @@ void IDs6::identifyLaunch()
         msg.exec();
         return;
     }
-    u32 expected = orasBase->getUInt() + static_cast<u32>(orasLaunchMs->value());
-    auto found = OrasTid::identify(expected, static_cast<u16>(orasTid->value()), orasNo->value(), orasTolerance->value());
+    if (orasTid->text().isEmpty())
+    {
+        QMessageBox msg(QMessageBox::Warning, tr("No TID"), tr("TID Obtained: the TID of the new game."));
+        msg.exec();
+        return;
+    }
+    u32 expected = orasBase->getUInt() + orasLaunchMs->getUInt();
+    auto found = OrasTid::identify(expected, orasTid->getUShort(), orasNo->getUInt(), orasTolerance->getUInt());
     identModel->clear();
     identModel->setHorizontalHeaderLabels({ tr("Seed"), tr("Off (ms)"), tr("TID"), tr("SID"), tr("TSV"), tr("TRV") });
     for (const auto &f : found)
@@ -955,5 +898,21 @@ void IDs6::identifyLaunch()
                                 new QStandardItem(QString::number(f.offset)), new QStandardItem(QString::number(f.ids.tid)),
                                 new QStandardItem(QString::number(f.ids.sid)), new QStandardItem(QString::number(f.ids.tsv)),
                                 new QStandardItem(QString::number(f.ids.trv)) });
+    }
+}
+
+void IDs6::fillFromLastLaunch()
+{
+    // The SID Finder starts from the latest launch with a TID (the new game to keep is launched last)
+    for (int row = launches->rowCount() - 1; row >= 0; row--)
+    {
+        QTableWidgetItem *t = launches->item(row, 1);
+        if (t && !t->text().trimmed().isEmpty())
+        {
+            QTableWidgetItem *m = launches->item(row, 0);
+            orasLaunchMs->setText(m ? m->text().trimmed() : "0");
+            orasTid->setText(t->text().trimmed());
+            return;
+        }
     }
 }

@@ -32,19 +32,16 @@
 #include <vector>
 
 class BlinkModel6;
+class IDsFilter;
 class BlinkSearcher6;
 class IDModel6;
 class OrasSearcher6;
-class QCheckBox;
-class QComboBox;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
 class QProgressBar;
 class QPushButton;
 class QRadioButton;
-class QSpinBox;
-class QStackedWidget;
 class QStandardItemModel;
 class QTableWidget;
 class QTabWidget;
@@ -67,58 +64,56 @@ protected:
     bool eventFilter(QObject *object, QEvent *event) override;
 
 private:
-    QComboBox *game;
-    QStackedWidget *pages; ///< XY tabs, ORAS tabs
-    QTabWidget *tabs;
+    QTabWidget *games; ///< X/Y, OR/AS
 
-    // Seed tab
+    // X/Y: Seed Finder (blinks)
     QPushButton *blink;
     QPushButton *clear;
     QLabel *tapStatus;
     QPlainTextEdit *gaps;
-    QSpinBox *advanceMin;
-    QSpinBox *advanceMax;
+    TextBox *advanceMin;
+    TextBox *advanceMax;
     QRadioButton *all;
     QRadioButton *near;
     TextBox *baseSeed;
-    QSpinBox *hours;
+    TextBox *hours;
     QPushButton *search;
     QPushButton *cancel;
     QProgressBar *progress;
     BlinkModel6 *seedModel;
     TableView *seedTable;
 
-    // IDs tab
+    // X/Y: Generator
     QLineEdit *state;
     QLineEdit *firstTap;
-    QSpinBox *idMin;
-    QSpinBox *idMax;
-    std::array<QCheckBox *, 4> filterOn;
-    std::array<QSpinBox *, 4> filterValue;
+    TextBox *idMin;
+    TextBox *idMax;
+    IDsFilter *filter;
     QPushButton *generate;
     IDModel6 *idModel;
     TableView *idTable;
     QPushButton *send;
     QPushButton *copy;
 
-    // ORAS
-    QTabWidget *orasTabs;
+    // OR/AS: Seed Finder (launches)
     QPushButton *launch;
     QPushButton *removeLaunch;
     QPushButton *clearLaunches;
     QLabel *launchStatus;
     QTableWidget *launches;
-    QSpinBox *tolerance;
+    TextBox *tolerance;
     QPushButton *orasSearch;
     QPushButton *orasCancel;
     QProgressBar *orasProgress;
     QStandardItemModel *baseModel;
     TableView *baseTable;
+
+    // OR/AS: SID Finder
     TextBox *orasBase;
-    QSpinBox *orasLaunchMs;
-    QSpinBox *orasTid;
-    QSpinBox *orasNo;
-    QSpinBox *orasTolerance;
+    TextBox *orasLaunchMs;
+    TextBox *orasTid;
+    TextBox *orasNo;
+    TextBox *orasTolerance;
     QPushButton *identify;
     QStandardItemModel *identModel;
     TableView *identTable;
@@ -136,6 +131,7 @@ private:
     bool parseState(std::array<u32, 4> &words) const;
     bool isOras() const;
     void saveLaunches() const;
+    void fillFromLastLaunch();
     QString handoffText(bool *ok);
 
 private slots:

@@ -23,6 +23,7 @@
 #ifndef IDGENERATOR6_HPP
 #define IDGENERATOR6_HPP
 
+#include <Core/Parents/Filters/IDFilter.hpp>
 #include <Core/Parents/States/IDState.hpp>
 #include <array>
 #include <optional>
@@ -70,5 +71,10 @@ struct IDFilter6
  * tapped blink's interval)
  */
 std::vector<IDState6> generateIDs6(const std::array<u32, 4> &state, u32 min, u32 max, const IDFilter6 &filter);
+
+/**
+ * @brief Same, with PokéFinder's ID filter (the IDs window's Filters box)
+ */
+std::vector<IDState6> generateIDs6(const std::array<u32, 4> &state, u32 min, u32 max, const IDFilter &filter);
 
 #endif // IDGENERATOR6_HPP

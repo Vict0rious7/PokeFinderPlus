@@ -22,22 +22,36 @@
 #include "IDGenerator6.hpp"
 #include <Core/Gen6/XYTid.hpp>
 
+namespace
+{
+    template <class Filter>
+    std::vector<IDState6> generate(const std::array<u32, 4> &state, u32 min, u32 max, const Filter &filter)
+    {
+        std::vector<IDState6> states;
+        XYTid::Tiny mt = XYTid::Tiny::fromState(state);
+        mt.advance(min);
+        for (u32 advance = min; advance <= max; advance++)
+        {
+            IDState6 id(advance, mt.next());
+            if (filter.compare(id))
+            {
+                states.emplace_back(id);
+            }
+            if (advance == 0xffffffff)
+            {
+                break;
+            }
+        }
+        return states;
+    }
+}
+
 std::vector<IDState6> generateIDs6(const std::array<u32, 4> &state, u32 min, u32 max, const IDFilter6 &filter)
 {
-    std::vector<IDState6> states;
-    XYTid::Tiny mt = XYTid::Tiny::fromState(state);
-    mt.advance(min);
-    for (u32 advance = min; advance <= max; advance++)
-    {
-        IDState6 id(advance, mt.next());
-        if (filter.compare(id))
-        {
-            states.emplace_back(id);
-        }
-        if (advance == 0xffffffff)
-        {
-            break;
-        }
-    }
-    return states;
+    return generate(state, min, max, filter);
+}
+
+std::vector<IDState6> generateIDs6(const std::array<u32, 4> &state, u32 min, u32 max, const IDFilter &filter)
+{
+    return generate(state, min, max, filter);
 }
