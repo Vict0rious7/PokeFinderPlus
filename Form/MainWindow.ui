@@ -180,7 +180,7 @@
         <item row="2" column="0">
          <widget class="QPushButton" name="pushButtonIDs6">
           <property name="text">
-           <string>IDs (X / Y)</string>
+           <string>IDs (XY / ORAS)</string>
           </property>
          </widget>
         </item>

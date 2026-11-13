@@ -18,6 +18,8 @@
  *
  * PokeFinderPlus: new file. XY Trainer ID RNG, Finder side: blink taps → initial seed, seed → IDs, and the handoff to
  * PokeTimerPlus. Method and values: BZL's 6genTidSearch (used with permission), https://blog.bzl-web.com/entry/2020/08/31/202306
+ * 2026-11-13: ORAS (OR / AS in the game list): base seed from the TIDs of new games launched at known times, then the
+ * SID / TSV of a new game. BZL's ORAS method, https://blog.bzl-web.com/entry/2020/08/24/225424
  */
 
 #ifndef IDS6_HPP
@@ -32,6 +34,7 @@
 class BlinkModel6;
 class BlinkSearcher6;
 class IDModel6;
+class OrasSearcher6;
 class QCheckBox;
 class QComboBox;
 class QLabel;
@@ -41,12 +44,16 @@ class QProgressBar;
 class QPushButton;
 class QRadioButton;
 class QSpinBox;
+class QStackedWidget;
+class QStandardItemModel;
+class QTableWidget;
 class QTabWidget;
 class TableView;
 class TextBox;
 
 /**
- * @brief XY IDs: find the initial seed from the professor's blinks, list the IDs, send the pick to PokeTimerPlus
+ * @brief XY IDs: find the initial seed from the professor's blinks, list the IDs, send the pick to PokeTimerPlus.
+ * ORAS IDs: find the base seed from launches, then the SID / TSV of a new game.
  */
 class IDs6 final : public QWidget
 {
@@ -56,8 +63,12 @@ public:
 
     ~IDs6() override;
 
+protected:
+    bool eventFilter(QObject *object, QEvent *event) override;
+
 private:
     QComboBox *game;
+    QStackedWidget *pages; ///< XY tabs, ORAS tabs
     QTabWidget *tabs;
 
     // Seed tab
@@ -90,6 +101,30 @@ private:
     QPushButton *send;
     QPushButton *copy;
 
+    // ORAS
+    QTabWidget *orasTabs;
+    QPushButton *launch;
+    QPushButton *removeLaunch;
+    QPushButton *clearLaunches;
+    QLabel *launchStatus;
+    QTableWidget *launches;
+    QSpinBox *tolerance;
+    QPushButton *orasSearch;
+    QPushButton *orasCancel;
+    QProgressBar *orasProgress;
+    QStandardItemModel *baseModel;
+    TableView *baseTable;
+    TextBox *orasBase;
+    QSpinBox *orasLaunchMs;
+    QSpinBox *orasTid;
+    QSpinBox *orasNo;
+    QSpinBox *orasTolerance;
+    QPushButton *identify;
+    QStandardItemModel *identModel;
+    TableView *identTable;
+    qint64 launchEpoch = 0; ///< first launch (ms since 1970), 0 if none; kept across window openings
+    OrasSearcher6 *orasRunning = nullptr;
+
     QElapsedTimer tapTimer;
     qint64 tapEpoch = 0; ///< first tap of the current recording (ms since 1970), 0 if none
     qint64 lastTapMs = 0;
@@ -99,6 +134,8 @@ private:
 
     std::vector<u32> parseGaps(bool *ok) const;
     bool parseState(std::array<u32, 4> &words) const;
+    bool isOras() const;
+    void saveLaunches() const;
     QString handoffText(bool *ok);
 
 private slots:
@@ -109,6 +146,12 @@ private slots:
     void generateIDs();
     void sendToTimer();
     void copyForTimer();
+    void addLaunch();
+    void removeLaunchRow();
+    void clearLaunchList();
+    void startOrasSearch();
+    void useBaseSeed(const QModelIndex &index);
+    void identifyLaunch();
 };
 
 #endif // IDS6_HPP

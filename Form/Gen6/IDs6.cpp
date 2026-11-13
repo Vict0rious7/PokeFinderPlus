@@ -23,6 +23,7 @@
 #include "IDs6.hpp"
 #include <Core/Gen6/Generators/IDGenerator6.hpp>
 #include <Core/Gen6/Searchers/BlinkSearcher6.hpp>
+#include <Core/Gen6/Searchers/OrasSearcher6.hpp>
 #include <Core/Gen6/XYTid.hpp>
 #include <Form/Controls/TableView.hpp>
 #include <Form/Controls/TextBox.hpp>
@@ -37,6 +38,8 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QHeaderView>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocalSocket>
@@ -49,11 +52,16 @@
 #include <QSettings>
 #include <QShortcut>
 #include <QSpinBox>
+#include <QStackedWidget>
+#include <QStandardItemModel>
 #include <QTabWidget>
+#include <QTableWidget>
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <limits>
+#include <memory>
 
 namespace
 {
@@ -108,18 +116,20 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_QuitOnClose, false);
     setAttribute(Qt::WA_DeleteOnClose);
-    setWindowTitle(tr("IDs (X / Y)"));
+    setWindowTitle(tr("IDs (XY / ORAS)"));
 
     auto *layout = new QVBoxLayout(this);
     auto *top = new QFormLayout;
     game = new QComboBox;
-    game->addItems({ tr("X"), tr("Y") });
+    game->addItems({ tr("X"), tr("Y"), tr("Omega Ruby"), tr("Alpha Sapphire") });
     game->setObjectName("comboBoxGame");
     top->addRow(tr("Game"), game);
     layout->addLayout(top);
 
+    pages = new QStackedWidget;
+    layout->addWidget(pages, 1);
     tabs = new QTabWidget;
-    layout->addWidget(tabs, 1);
+    pages->addWidget(tabs);
 
     // ---- Seed (blinks) ----
     auto *seedPage = new QWidget;
@@ -252,6 +262,104 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     idLayout->addLayout(sendRow);
     tabs->addTab(idPage, tr("2. IDs"));
 
+    // ---- ORAS: seed from launches ----
+    orasTabs = new QTabWidget;
+    orasTabs->setObjectName("tabWidgetOras");
+    pages->addWidget(orasTabs);
+    auto *launchPage = new QWidget;
+    launchPage->setObjectName("launchPage");
+    launchPage->setFocusPolicy(Qt::ClickFocus);
+    auto *launchLayout = new QVBoxLayout(launchPage);
+
+    auto *launchBox = new QGroupBox(tr("New games"));
+    auto *launchGrid = new QGridLayout(launchBox);
+    launch = new QPushButton(tr("Launch  (Space)"));
+    launch->setObjectName("pushButtonLaunch");
+    launch->setMinimumHeight(48);
+    launch->setFocusPolicy(Qt::NoFocus);
+    removeLaunch = new QPushButton(tr("Remove"));
+    removeLaunch->setFocusPolicy(Qt::NoFocus);
+    clearLaunches = new QPushButton(tr("Clear"));
+    clearLaunches->setFocusPolicy(Qt::NoFocus);
+    launchStatus = new QLabel;
+    launchStatus->setObjectName("labelLaunchStatus");
+    launches = new QTableWidget(0, 2);
+    launches->setObjectName("tableWidgetLaunches");
+    launches->setHorizontalHeaderLabels({ tr("Launch (ms)"), tr("TID") });
+    launches->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    launches->setFocusPolicy(Qt::ClickFocus);
+    launches->setMaximumWidth(300);
+    launchGrid->addWidget(launch, 0, 0, 1, 2);
+    launchGrid->addWidget(removeLaunch, 1, 0);
+    launchGrid->addWidget(clearLaunches, 1, 1);
+    launchGrid->addWidget(launchStatus, 2, 0, 1, 2);
+    launchGrid->setRowStretch(3, 1);
+    launchGrid->addWidget(launches, 0, 2, 4, 1);
+    launchLayout->addWidget(launchBox);
+
+    auto *orasSettings = new QGroupBox(tr("Search"));
+    auto *orasForm = new QFormLayout(orasSettings);
+    tolerance = spin(0, 60000, OrasTid::DEFAULT_TOLERANCE, "spinBoxTolerance");
+    tolerance->setPrefix(tr("± "));
+    tolerance->setSuffix(tr(" ms"));
+    orasForm->addRow(tr("Tolerance"), tolerance);
+    launchLayout->addWidget(orasSettings);
+
+    auto *orasButtons = new QHBoxLayout;
+    orasSearch = new QPushButton(tr("Search"));
+    orasSearch->setObjectName("pushButtonOrasSearch");
+    orasCancel = new QPushButton(tr("Cancel"));
+    orasCancel->setEnabled(false);
+    orasProgress = new QProgressBar;
+    orasProgress->setRange(0, 100);
+    orasProgress->setValue(0);
+    orasButtons->addWidget(orasSearch);
+    orasButtons->addWidget(orasCancel);
+    orasButtons->addWidget(orasProgress, 1);
+    launchLayout->addLayout(orasButtons);
+
+    baseModel = new QStandardItemModel(this);
+    baseTable = new TableView;
+    baseTable->setObjectName("tableViewBaseSeeds");
+    baseTable->setModel(baseModel);
+    baseTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    baseTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    launchLayout->addWidget(baseTable, 1);
+    orasTabs->addTab(launchPage, tr("1. Seed from launches"));
+
+    // ---- ORAS: SID / TSV of a launch ----
+    auto *identPage = new QWidget;
+    auto *identLayout = new QVBoxLayout(identPage);
+    auto *identBox = new QGroupBox(tr("Launch"));
+    auto *identForm = new QFormLayout(identBox);
+    orasBase = new TextBox;
+    orasBase->setObjectName("textBoxOrasBase");
+    orasBase->setValues(InputType::Seed32Bit);
+    identForm->addRow(tr("Base seed"), orasBase);
+    orasLaunchMs = spin(0, std::numeric_limits<int>::max(), 0, "spinBoxOrasLaunch");
+    orasLaunchMs->setSuffix(tr(" ms"));
+    identForm->addRow(tr("Launch"), orasLaunchMs);
+    orasTid = spin(0, 65535, 0, "spinBoxOrasTID");
+    identForm->addRow(tr("TID"), orasTid);
+    orasNo = spin(0, 100000, 0, "spinBoxOrasNo");
+    identForm->addRow(tr("\"No\" at the name"), orasNo);
+    orasTolerance = spin(0, 60000, OrasTid::DEFAULT_TOLERANCE, "spinBoxOrasTolerance");
+    orasTolerance->setPrefix(tr("± "));
+    orasTolerance->setSuffix(tr(" ms"));
+    identForm->addRow(tr("Tolerance"), orasTolerance);
+    identify = new QPushButton(tr("Find"));
+    identify->setObjectName("pushButtonIdentify");
+    identForm->addRow(identify);
+    identLayout->addWidget(identBox);
+
+    identModel = new QStandardItemModel(this);
+    identTable = new TableView;
+    identTable->setObjectName("tableViewIdentified");
+    identTable->setModel(identModel);
+    identTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    identLayout->addWidget(identTable, 1);
+    orasTabs->addTab(identPage, tr("2. SID / TSV"));
+
     auto *space = new QShortcut(QKeySequence(Qt::Key_Space), this);
     connect(space, &QShortcut::activated, this, &IDs6::tap);
     connect(blink, &QPushButton::pressed, this, &IDs6::tap); // on press, not release: closer to the blink
@@ -261,30 +369,113 @@ IDs6::IDs6(QWidget *parent) : QWidget(parent)
     connect(generate, &QPushButton::clicked, this, &IDs6::generateIDs);
     connect(send, &QPushButton::clicked, this, &IDs6::sendToTimer);
     connect(copy, &QPushButton::clicked, this, &IDs6::copyForTimer);
+    connect(launch, &QPushButton::pressed, this, &IDs6::addLaunch); // on press, together with A
+    connect(removeLaunch, &QPushButton::clicked, this, &IDs6::removeLaunchRow);
+    connect(clearLaunches, &QPushButton::clicked, this, &IDs6::clearLaunchList);
+    connect(launches, &QTableWidget::itemChanged, this, &IDs6::saveLaunches);
+    connect(orasSearch, &QPushButton::clicked, this, &IDs6::startOrasSearch);
+    connect(baseTable->selectionModel(), &QItemSelectionModel::currentRowChanged, this, &IDs6::useBaseSeed);
+    connect(identify, &QPushButton::clicked, this, &IDs6::identifyLaunch);
+    connect(orasTabs, &QTabWidget::currentChanged, this, [this](int index) {
+        // The SID / TSV tab starts from the latest launch with a TID (the new game to keep is launched last)
+        if (index != 1)
+        {
+            return;
+        }
+        for (int row = launches->rowCount() - 1; row >= 0; row--)
+        {
+            QTableWidgetItem *t = launches->item(row, 1);
+            if (t && !t->text().trimmed().isEmpty())
+            {
+                QTableWidgetItem *m = launches->item(row, 0);
+                orasLaunchMs->setValue(m ? m->text().toInt() : 0);
+                orasTid->setValue(t->text().toInt());
+                break;
+            }
+        }
+        if (!orasBase->text().isEmpty())
+        {
+            identifyLaunch();
+        }
+    });
+    connect(game, &QComboBox::currentIndexChanged, this, [this](int index) { pages->setCurrentIndex(index >= 2 ? 1 : 0); });
 
     QSettings setting;
     game->setCurrentIndex(setting.value("ids6/game", 0).toInt());
+    pages->setCurrentIndex(isOras() ? 1 : 0);
+    tolerance->setValue(setting.value("ids6/orasTolerance", OrasTid::DEFAULT_TOLERANCE).toInt());
+    launchEpoch = setting.value("ids6/orasLaunchEpoch", 0).toLongLong();
+    {
+        QSignalBlocker block(launches);
+        for (const QString &entry : setting.value("ids6/orasLaunches").toStringList())
+        {
+            QStringList parts = entry.split(':');
+            int row = launches->rowCount();
+            launches->insertRow(row);
+            launches->setItem(row, 0, new QTableWidgetItem(parts.value(0)));
+            launches->setItem(row, 1, new QTableWidgetItem(parts.value(1)));
+        }
+    }
+    if (launches->rowCount() == 0)
+    {
+        launchEpoch = 0;
+    }
+    launchStatus->setText(launchEpoch ? tr("First launch at %1").arg(clock(launchEpoch)) : tr("No launch yet"));
     if (setting.contains("ids6/geometry"))
     {
         restoreGeometry(setting.value("ids6/geometry").toByteArray());
     }
     seedPage->setFocus(); // Space taps (a focused text field would take it)
+    if (isOras())
+    {
+        launchPage->setFocus();
+    }
+    // Space adds a launch even while a TID is being typed in the table (the cell's editor would take it otherwise)
+    qApp->installEventFilter(this);
+}
+
+bool IDs6::eventFilter(QObject *object, QEvent *event)
+{
+    if (event->type() == QEvent::ShortcutOverride && isActiveWindow() && isOras() && orasTabs->currentIndex() == 0)
+    {
+        auto *key = static_cast<QKeyEvent *>(event);
+        if (key->key() == Qt::Key_Space && key->modifiers() == Qt::NoModifier)
+        {
+            return true; // not accepted by the editor: the Space shortcut fires
+        }
+    }
+    return QWidget::eventFilter(object, event);
 }
 
 IDs6::~IDs6()
 {
+    qApp->removeEventFilter(this);
     if (running)
     {
         running->cancelSearch();
         delete running; // joins the threads
     }
+    if (orasRunning)
+    {
+        orasRunning->cancelSearch();
+        delete orasRunning;
+    }
     QSettings setting;
+    setting.setValue("ids6/orasTolerance", tolerance->value());
     setting.setValue("ids6/game", game->currentIndex());
     setting.setValue("ids6/geometry", saveGeometry());
 }
 
 void IDs6::tap()
 {
+    if (isOras())
+    {
+        if (orasTabs->currentIndex() == 0)
+        {
+            addLaunch();
+        }
+        return;
+    }
     if (tabs->currentIndex() != 0)
     {
         return;
@@ -547,5 +738,222 @@ void IDs6::copyForTimer()
     if (ok)
     {
         QApplication::clipboard()->setText(text);
+    }
+}
+
+bool IDs6::isOras() const
+{
+    return game->currentIndex() >= 2;
+}
+
+void IDs6::saveLaunches() const
+{
+    QStringList list;
+    for (int row = 0; row < launches->rowCount(); row++)
+    {
+        QTableWidgetItem *m = launches->item(row, 0);
+        QTableWidgetItem *t = launches->item(row, 1);
+        list.append((m ? m->text().trimmed() : QString()) + ":" + (t ? t->text().trimmed() : QString()));
+    }
+    QSettings setting;
+    setting.setValue("ids6/orasLaunches", list);
+    setting.setValue("ids6/orasLaunchEpoch", launchEpoch);
+}
+
+void IDs6::addLaunch()
+{
+    // Wall clock, so a launch list survives closing the window (the first launch's time is saved)
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (launches->isAncestorOf(QApplication::focusWidget()))
+    {
+        orasTabs->widget(0)->setFocus(); // commits the TID being typed
+    }
+    if (launches->rowCount() == 0 || launchEpoch == 0)
+    {
+        launches->setRowCount(0);
+        launchEpoch = now;
+    }
+    QSignalBlocker block(launches);
+    int row = launches->rowCount();
+    launches->insertRow(row);
+    launches->setItem(row, 0, new QTableWidgetItem(QString::number(now - launchEpoch)));
+    launches->setItem(row, 1, new QTableWidgetItem());
+    launches->scrollToBottom();
+    launchStatus->setText(tr("First launch at %1").arg(clock(launchEpoch)));
+    saveLaunches();
+}
+
+void IDs6::removeLaunchRow()
+{
+    int row = launches->currentRow();
+    if (row < 0)
+    {
+        row = launches->rowCount() - 1;
+    }
+    if (row < 0)
+    {
+        return;
+    }
+    launches->removeRow(row);
+    if (launches->rowCount() == 0)
+    {
+        launchEpoch = 0;
+        launchStatus->setText(tr("No launch yet"));
+    }
+    saveLaunches();
+}
+
+void IDs6::clearLaunchList()
+{
+    if (launches->rowCount() > 0)
+    {
+        QMessageBox msg(QMessageBox::Question, tr("Clear"), tr("Remove every launch?"), QMessageBox::Yes | QMessageBox::No);
+        if (msg.exec() != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
+    launches->setRowCount(0);
+    launchEpoch = 0;
+    launchStatus->setText(tr("No launch yet"));
+    saveLaunches();
+}
+
+void IDs6::startOrasSearch()
+{
+    if (orasRunning)
+    {
+        return;
+    }
+    std::vector<OrasTid::Launch> list;
+    for (int row = 0; row < launches->rowCount(); row++)
+    {
+        QTableWidgetItem *m = launches->item(row, 0);
+        QTableWidgetItem *t = launches->item(row, 1);
+        bool okMs = false, okTid = false;
+        qint64 ms = m ? m->text().trimmed().toLongLong(&okMs) : 0;
+        int tid = t ? t->text().trimmed().toInt(&okTid) : 0;
+        if (!okMs || !okTid || ms < 0 || tid < 0 || tid > 65535)
+        {
+            QMessageBox msg(QMessageBox::Warning, tr("Launch %1").arg(row + 1),
+                            tr("Launch %1 needs a time in ms and a TID (0 to 65535).").arg(row + 1));
+            msg.exec();
+            return;
+        }
+        list.emplace_back(OrasTid::Launch { static_cast<u32>(ms), static_cast<u16>(tid) });
+    }
+    if (list.size() < 2)
+    {
+        QMessageBox msg(QMessageBox::Warning, tr("Launches"), tr("At least 2 launches."));
+        msg.exec();
+        return;
+    }
+    // Times are counted from the first launch
+    u32 first = list[0].ms;
+    for (auto &l : list)
+    {
+        l.ms -= first;
+    }
+    if (list.size() < 4)
+    {
+        QMessageBox msg(QMessageBox::Question, tr("Few launches"),
+                        tr("Only %1 launches: many seeds may match. Search anyway?").arg(list.size()), QMessageBox::Yes | QMessageBox::No);
+        if (msg.exec() != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
+
+    QSettings setting;
+    int threads = setting.value("settings/threads", QThread::idealThreadCount()).toInt();
+    auto *searcher = new OrasSearcher6();
+    if (!searcher->startSearch(threads, list, tolerance->value()))
+    {
+        delete searcher;
+        return;
+    }
+
+    orasRunning = searcher;
+    baseModel->clear();
+    QStringList headers { tr("Base seed") };
+    for (size_t i = 0; i < list.size(); i++)
+    {
+        headers.append(tr("Launch %1").arg(i + 1));
+    }
+    baseModel->setHorizontalHeaderLabels(headers);
+    orasTolerance->setValue(tolerance->value());
+    orasSearch->setEnabled(false);
+    orasCancel->setEnabled(true);
+    orasProgress->setValue(0);
+
+    auto collected = std::make_shared<std::vector<OrasTid::BaseMatch>>();
+    auto *timer = new QTimer(this);
+    connect(orasCancel, &QPushButton::clicked, timer, [this, searcher] {
+        searcher->cancelSearch();
+        orasCancel->setEnabled(false);
+    });
+    connect(timer, &QTimer::timeout, this, [this, searcher, timer, collected] {
+        auto more = searcher->getResults();
+        collected->insert(collected->end(), more.begin(), more.end());
+        orasProgress->setValue(searcher->getProgress());
+        if (searcher->isSearching())
+        {
+            return;
+        }
+        timer->stop();
+        more = searcher->getResults();
+        collected->insert(collected->end(), more.begin(), more.end());
+        std::stable_sort(collected->begin(), collected->end(), [](const auto &a, const auto &b) { return a.seed < b.seed; });
+        for (const auto &match : *collected)
+        {
+            QList<QStandardItem *> row { new QStandardItem(QString::number(match.seed, 16).toUpper().rightJustified(8, '0')) };
+            for (s32 offset : match.offsets)
+            {
+                row.append(new QStandardItem(QString::number(offset)));
+            }
+            baseModel->appendRow(row);
+        }
+        if (collected->empty() && !searcher->isCancelled())
+        {
+            QMessageBox msg(QMessageBox::Information, tr("No seed"), tr("No base seed explains these launches."));
+            msg.exec();
+        }
+        delete searcher;
+        orasRunning = nullptr;
+        orasSearch->setEnabled(true);
+        orasCancel->setEnabled(false);
+        orasProgress->setValue(100);
+        timer->deleteLater();
+    });
+    timer->start(200);
+}
+
+void IDs6::useBaseSeed(const QModelIndex &index)
+{
+    if (!index.isValid())
+    {
+        return;
+    }
+    orasBase->setText(baseModel->item(index.row(), 0)->text());
+}
+
+void IDs6::identifyLaunch()
+{
+    if (orasBase->text().isEmpty())
+    {
+        QMessageBox msg(QMessageBox::Warning, tr("No base seed"), tr("Base seed: select one on tab 1 or type it."));
+        msg.exec();
+        return;
+    }
+    u32 expected = orasBase->getUInt() + static_cast<u32>(orasLaunchMs->value());
+    auto found = OrasTid::identify(expected, static_cast<u16>(orasTid->value()), orasNo->value(), orasTolerance->value());
+    identModel->clear();
+    identModel->setHorizontalHeaderLabels({ tr("Seed"), tr("Off (ms)"), tr("TID"), tr("SID"), tr("TSV"), tr("TRV") });
+    for (const auto &f : found)
+    {
+        identModel->appendRow({ new QStandardItem(QString::number(f.seed, 16).toUpper().rightJustified(8, '0')),
+                                new QStandardItem(QString::number(f.offset)), new QStandardItem(QString::number(f.ids.tid)),
+                                new QStandardItem(QString::number(f.ids.sid)), new QStandardItem(QString::number(f.ids.tsv)),
+                                new QStandardItem(QString::number(f.ids.trv)) });
     }
 }

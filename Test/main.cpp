@@ -55,6 +55,7 @@
 #include <Test/Gen5/WildGenerator5Test.hpp>
 #include <Test/Gen6/SeedSearcher6Test.hpp> // PokeFinderPlus
 #include <Test/Gen6/StaticGenerator6Test.hpp> // PokeFinderPlus
+#include <Test/Gen6/OrasTidTest.hpp> // PokeFinderPlus
 #include <Test/Gen6/XYTidTest.hpp> // PokeFinderPlus
 #include <Test/Gen8/EggGenerator8Test.hpp>
 #include <Test/Gen8/EventGenerator8Test.hpp>
@@ -137,6 +138,7 @@ int main()
     status += runTest<SeedSearcher6Test>(fails);
     status += runTest<StaticGenerator6Test>(fails);
     status += runTest<XYTidTest>(fails);
+    status += runTest<OrasTidTest>(fails); // PokeFinderPlus
 
     // Gen 8
     status += runTest<IDGenerator8Test>(fails);

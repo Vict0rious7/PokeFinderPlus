@@ -20,7 +20,7 @@
  * window title, About box and update check point to the fork; About credits the FRLG seed data.
  * 2026-11-07: Gen 6 tab (Static, Seed Finder) and Gen 6 profile manager.
  * 2026-11-08: update check compares the whole release tag (versions like 4.4.2-plus.1).
- * 2026-11-12: Gen 6 IDs (X / Y) window.
+ * 2026-11-12: Gen 6 IDs (X / Y) window. 2026-11-13: ORAS in the same window, button "IDs (XY / ORAS)".
  */
 
 #include "MainWindow.hpp"
