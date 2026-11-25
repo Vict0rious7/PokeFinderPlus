@@ -66,8 +66,12 @@ add_library(PokeFinderCore STATIC
     Enum/PassPower.hpp
     Enum/ShadowType.hpp
     Enum/Shiny.hpp
+    Gen2/CelebiCalibration.cpp
+    Gen2/CelebiCalibration.hpp
     Gen2/CelebiPlan.cpp
     Gen2/CelebiPlan.hpp
+    Gen2/CelebiSearch.cpp
+    Gen2/CelebiSearch.hpp
     Gen2/CrystalSave.cpp
     Gen2/CrystalSave.hpp
     Gen2/VcCore.cpp

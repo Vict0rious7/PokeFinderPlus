@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/data">
         <file alias="gen2_plan.json">Gen2/golden2/plan.json</file> <!-- PokeFinderPlus -->
+        <file alias="gen2_search.json">Gen2/golden2/search.json</file> <!-- PokeFinderPlus -->
         <file alias="gen2_save.json">Gen2/golden2/save.json</file> <!-- PokeFinderPlus -->
         <file alias="gen2_core.json">Gen2/golden2/core.json</file> <!-- PokeFinderPlus -->
 

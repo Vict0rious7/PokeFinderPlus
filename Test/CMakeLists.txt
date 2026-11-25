@@ -23,6 +23,8 @@ qt_add_executable(PokeFinderTest
     ${ENUM_HPP}
     Gen2/CelebiPlanTest.cpp
     Gen2/CelebiPlanTest.hpp
+    Gen2/CelebiSearchTest.cpp
+    Gen2/CelebiSearchTest.hpp
     Gen2/CrystalSaveTest.cpp
     Gen2/CrystalSaveTest.hpp
     Gen2/Gen2TestFiles.cpp

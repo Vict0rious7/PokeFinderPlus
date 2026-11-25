@@ -150,7 +150,64 @@ def sec_plan():
     dump('plan.json', out)
 
 
-SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan)
+FS_DIRS = dict(fr='runs/fs_fr', de='runs/fs_de', es='runs/fs_es', en='runs/fs_en', it='runs/fs_it', fr_k2='runs/t25/fs2_fr',
+               it_k2='runs/t25/fs2_it', en_test='runs/t25/fs_np')
+
+
+def grid_str(g, D, pre=''):
+    """leaf dict -> one hex string in (e6, eYES, efinal) order, each -D..D"""
+    r = range(-D, D + 1)
+    return ''.join(g[pre + '%d,%d,%d' % (a, b, c)] for a in r for b in r for c in r)
+
+
+def sec_search():
+    """Step 4: picks of the stored fsearch directories (all hits), a recompute sample of fsearch jobs, 20 sampled jobs of
+    fg3_fr / fgx_fr / cal3_fr, regr.py's 20 rows, clock sweeps (windows) of FR and IT plan 1."""
+    R = random.Random(4)
+    out = dict(picks={}, fsjobs=[], grids=[], regr=[], sweeps=[])
+    for name, d in FS_DIRS.items():
+        G = ct.load_jobs(os.path.join(WS, d))
+        keys = sorted(G)
+        hits = [h for k in keys for h in G[k]]
+        p1, p2 = ct.pick(hits)
+        i1 = next(i for i, h in enumerate(hits) if h is p1)
+        i2 = next(i for i, h in enumerate(hits) if h is p2)
+        out['picks'][name] = dict(dir=d, keys=keys, hits=hits, p1=i1, p2=i2, union=len(set(p1['F_ok']) | set(p2['F_ok'])))
+        if name == 'en_test':
+            continue          # its save (np_k2k2.sav) is not rebuilt here: pick only
+        lang = name[:2]
+        with_hits = [k for k in keys if any(h is p1 or h is p2 for h in G[k])]
+        without = R.sample([k for k in keys if not G[k]], 2)
+        for k in with_hits + without:
+            out['fsjobs'].append(dict(set=name, lang=lang, key=k, save='victor', kenji=2 if name.endswith('_k2') else None,
+                                      rtcs=sorted({kk.split('_')[-1] for kk in keys}), hits=G[k]))
+    # grids of FR plans 1 + 2 (fs_fr pick) and the calibration grid cal3_fr (plan 0 / 0 / plan 1 final, in-game 20:30)
+    for gdir, n in (('runs/fg3_fr', 20), ('runs/fgx_fr', 20), ('runs/cal3_fr', 20)):
+        G = ct.load_jobs(os.path.join(WS, gdir))
+        for k in R.sample(sorted(G), n):
+            D = round(len(G[k]) ** (1 / 3)) // 2
+            pre = '' if k.startswith('f_') else '%d,' % int(k.split('_')[4])
+            out['grids'].append(dict(set=gdir.split('/')[-1], key=k, D=D, leaves=grid_str(G[k], D, pre)))
+        out['grid_keys_' + gdir.split('/')[-1]] = sorted(G)
+    # regr.py: leaf 0,0,0 of the D = 2 switch grid at F 7 and 26, plans 1 + 2, five languages, vs fg3_<lang>
+    for l in LANGS:
+        G = ct.load_jobs(os.path.join(WS, 'runs/fg3_' + l))
+        for i in (0, 1):
+            for F in (7, 26):
+                out['regr'].append(dict(lang=l, plan=i, F=F, dv=G['f_%d_%02d' % (i, F)]['0,0,0']))
+    # windows: chip-minute sweeps of FR and IT plan 1 (offset 2:18)
+    sram = ct.sram_of(VICTOR_SAVE)
+    for l in ('fr', 'it'):
+        P = json.load(open('plan_%s_lp.json' % l))
+        p1 = out['picks'][l]['hits'][out['picks'][l]['p1']]
+        g2lib._roms.clear()
+        res = ct.sweep(l, sram, ct.plan_events(P, p1['d6'], p1['dyes'], p1['final']), 4)
+        out['sweeps'].append(dict(lang=l, d6=p1['d6'], dyes=p1['dyes'], final=p1['final'], offset='2:18',
+                                  res=[res[t] for t in range(1440)], windows=ct.windows(res, ct.hm('2:18'))))
+    dump('search.json', out)
+
+
+SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search)
 if __name__ == '__main__':
     for s in sys.argv[1:] or SECTIONS:
         SECTIONS[s]()
