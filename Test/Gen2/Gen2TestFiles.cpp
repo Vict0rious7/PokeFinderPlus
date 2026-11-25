@@ -1,0 +1,150 @@
+/*
+ * PokeFinderPlus: new file. Game files for the Gen 2 tests (see Gen2TestFiles.hpp).
+ *
+ * Copyright (C) 2026 Vict0rious7. GPL-3.0-or-later (see LICENSE).
+ */
+
+#include "Gen2TestFiles.hpp"
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <cstdio>
+#include <cstdlib>
+#include <mutex>
+
+namespace Gen2Test
+{
+    namespace
+    {
+        std::map<std::string, std::shared_ptr<const Bytes>> &files(const char *env, std::size_t limit)
+        {
+            static std::map<std::string, std::map<std::string, std::shared_ptr<const Bytes>>> cache;
+            static std::mutex m;
+            std::lock_guard<std::mutex> lock(m);
+            auto it = cache.find(env);
+            if (it != cache.end())
+            {
+                return it->second;
+            }
+            auto &out = cache[env];
+            const char *dir = std::getenv(env);
+            if (!dir || !*dir)
+            {
+                return out;
+            }
+            QDir d(QString::fromLocal8Bit(dir));
+            for (const QFileInfo &fi : d.entryInfoList(QDir::Files))
+            {
+                if (fi.size() > 4 * 1024 * 1024)
+                {
+                    continue;
+                }
+                QFile f(fi.absoluteFilePath());
+                if (!f.open(QIODevice::ReadOnly))
+                {
+                    continue;
+                }
+                QByteArray b = f.readAll();
+                auto bytes = std::make_shared<Bytes>(b.begin(), b.end());
+                std::size_t n = std::min(limit, bytes->size());
+                if (limit != SIZE_MAX)
+                {
+                    bytes->resize(n);
+                }
+                out[fnv64(bytes->data(), bytes->size())] = bytes;
+            }
+            return out;
+        }
+
+        std::vector<std::string> &skips()
+        {
+            static std::vector<std::string> s;
+            return s;
+        }
+    }
+
+    std::string fnv64(const std::uint8_t *p, std::size_t n)
+    {
+        std::uint64_t h = 1469598103934665603ULL;
+        for (std::size_t i = 0; i < n; i++)
+        {
+            h ^= p[i];
+            h *= 1099511628211ULL;
+        }
+        char buf[17];
+        std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(h));
+        return buf;
+    }
+
+    const json &golden(const std::string &name)
+    {
+        static std::map<std::string, json> cache;
+        static std::mutex m;
+        std::lock_guard<std::mutex> lock(m);
+        auto it = cache.find(name);
+        if (it != cache.end())
+        {
+            return it->second;
+        }
+        QFile file(QString::fromStdString(":/data/" + name));
+        json data;
+        if (file.open(QIODevice::ReadOnly))
+        {
+            data = json::parse(file.readAll().toStdString());
+        }
+        return cache[name] = data;
+    }
+
+    std::shared_ptr<const Bytes> rom(const std::string &fnvHex)
+    {
+        auto &f = files("POKEFINDERPLUS_GBC_ROMS", SIZE_MAX);
+        auto it = f.find(fnvHex);
+        return it == f.end() ? nullptr : it->second;
+    }
+
+    std::optional<Bytes> save(const std::string &fnvHex)
+    {
+        auto &f = files("POKEFINDERPLUS_GEN2_SAVES", 0x8000);
+        auto it = f.find(fnvHex);
+        if (it == f.end())
+        {
+            return std::nullopt;
+        }
+        return *it->second;
+    }
+
+    void countSkip(const std::string &what)
+    {
+        skips().push_back(what);
+    }
+
+    std::string summary()
+    {
+        if (skips().empty())
+        {
+            return "Gen 2: no test skipped";
+        }
+        std::string s = "Gen 2: " + std::to_string(skips().size())
+            + " test(s) skipped (set POKEFINDERPLUS_GBC_ROMS / POKEFINDERPLUS_GEN2_SAVES to run them):";
+        for (const auto &w : skips())
+        {
+            s += "\n  - " + w;
+        }
+        return s;
+    }
+
+    Bytes joyFromRle(const json &rle, int n)
+    {
+        Bytes j(n, 0);
+        for (const auto &r : rle)
+        {
+            int a = r[0].get<int>(), b = r[1].get<int>();
+            auto m = r[2].get<std::uint8_t>();
+            for (int k = std::max(a, 0); k < std::min(b, n); k++)
+            {
+                j[k] |= m;
+            }
+        }
+        return j;
+    }
+}

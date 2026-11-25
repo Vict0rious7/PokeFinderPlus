@@ -17,11 +17,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Modified 2026-11-07 by Vict0rious7 for PokeFinderPlus (unofficial fork):
- * Gen 6 tests.
+ * Gen 6 tests; Gen 2 (Crystal VC Celebi) tests.
  */
 
 #include <QDebug>
 #include <QTest>
+#include <Test/Gen2/Gen2TestFiles.hpp> // PokeFinderPlus
+#include <Test/Gen2/VcCoreTest.hpp> // PokeFinderPlus
 #include <Test/Gen3/EggGenerator3Test.hpp>
 #include <Test/Gen3/GameCubeGeneratorTest.hpp>
 #include <Test/Gen3/GameCubeSearcherTest.hpp>
@@ -96,6 +98,9 @@ int main()
 {
     int status = 0;
     QStringList fails;
+
+    // Gen 2 (PokeFinderPlus)
+    status += runTest<VcCoreTest>(fails);
 
     // Gen 3
     status += runTest<EggGenerator3Test>(fails);
@@ -172,6 +177,7 @@ int main()
     status += runTest<IVToPIDCalculatorTest>(fails);
 
     qDebug() << "";
+    qDebug().noquote() << QString::fromStdString(Gen2Test::summary()); // PokeFinderPlus
     // Summary of failures at end for easy viewing
     for (const QString &fail : fails)
     {

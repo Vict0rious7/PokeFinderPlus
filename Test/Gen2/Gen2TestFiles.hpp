@@ -1,0 +1,45 @@
+/*
+ * PokeFinderPlus: new file. Game files for the Gen 2 tests, found at run time (never in the repository).
+ *
+ * Copyright (C) 2026 Vict0rious7. GPL-3.0-or-later (see LICENSE).
+ *
+ * POKEFINDERPLUS_GBC_ROMS: a folder with the player's Crystal ROMs (any file names; each is recognised by its hash).
+ * POKEFINDERPLUS_GEN2_SAVES: a folder with the saves the goldens were made with (any file names; recognised by the hash
+ * of their first 32 KB). Tests that need a missing file are skipped, and countSkip() records why.
+ */
+
+#ifndef GEN2TESTFILES_HPP
+#define GEN2TESTFILES_HPP
+
+#include <Test/Data.hpp>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace Gen2Test
+{
+    using Bytes = std::vector<std::uint8_t>;
+
+    /// FNV-1a 64 of a byte range, as hex (same as make_goldens.py's fnv64).
+    std::string fnv64(const std::uint8_t *p, std::size_t n);
+
+    /// Golden file from the test resources (:/data/<name>).
+    const json &golden(const std::string &name);
+
+    /// ROM whose FNV-1a 64 is fnvHex, from $POKEFINDERPLUS_GBC_ROMS; null when missing.
+    std::shared_ptr<const Bytes> rom(const std::string &fnvHex);
+    /// First 32 KB of the save whose first 32 KB hash to fnvHex, from $POKEFINDERPLUS_GEN2_SAVES; empty when missing.
+    std::optional<Bytes> save(const std::string &fnvHex);
+
+    /// Records a skipped test and its reason; summary() prints the count at the end of the run.
+    void countSkip(const std::string &what);
+    std::string summary();
+
+    /// Joypad timeline from the golden run-length form [[start, end, mask], ...] over n VBlanks.
+    Bytes joyFromRle(const json &rle, int n);
+}
+
+#endif // GEN2TESTFILES_HPP

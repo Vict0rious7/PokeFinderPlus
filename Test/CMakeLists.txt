@@ -21,6 +21,10 @@ qt_add_executable(PokeFinderTest
     Data.hpp
     ${PROJECT_RESOURCES}
     ${ENUM_HPP}
+    Gen2/Gen2TestFiles.cpp
+    Gen2/Gen2TestFiles.hpp
+    Gen2/VcCoreTest.cpp
+    Gen2/VcCoreTest.hpp
     Gen3/EggGenerator3Test.cpp
     Gen3/EggGenerator3Test.hpp
     Gen3/GameCubeGeneratorTest.cpp
