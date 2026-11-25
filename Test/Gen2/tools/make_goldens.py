@@ -338,7 +338,80 @@ def sec_switch():
     dump('switch.json', out)
 
 
-SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search, cal=sec_cal, switch=sec_switch)
+def sec_session():
+    """Step 7: session state + resave_step (prototype functions) on the class-1 and class->=2 paths, the calibrate --session
+    update (CLI code), and the re-save gate on the core (V06-RESULTS section 1; resave_gate.py itself is not archived):
+    core re-save as mk_resave.py (FR title, plan 0 / 0 / 1933, run to VBlank 900 at the re-save moment, copy the saved WRAM
+    segments into the save), then Celebi of the re-saved file vs the rebuild (template = the save before the re-save +
+    the re-saved file's minimal values + Kenji class 1 or >= 2) on 20 random timelines 3-22 chip days later."""
+    import copy
+    from savetool import Save, SEG, SYM
+    from savebuild import apply_minimal, read_minimal
+    out = dict(resave=[], calibrate=None, gate=[])
+    # resave_step paths
+    for start in (1, 0, 2):
+        s = ct.session_load(None)
+        s.update(kenji_class=start, X=-21, timer_ms=1700, needs_calibration=False)
+        seq = []
+        for _ in range(3 if start != 2 else 2):
+            before = copy.deepcopy(s)
+            lines = ct.resave_step(s)
+            seq.append(dict(before=before, lines=lines, after=copy.deepcopy(s)))
+            if s['kenji_class'] is None:
+                s['kenji_class'] = 2      # the recalibration found class >= 2
+        out['resave'].append(seq)
+    # calibrate --session (CLI update), on the EN harness calibration at 10 attempts (b5)
+    inv = ct.cal_index(os.path.join(WS, 'runs/t25/cal3_np20'))
+    att = json.load(open(os.path.join(WS, 'runs/t25/h_b5/cal_attempts.json')))
+    rank = ct.cal_rank(att, None, (1, 2), 3, inv); v = ct.cal_verdict(rank, len(att)); b = v['best']
+    ev = ct.carry_evidence(att, inv, b['kenji'], b['X'], 3)
+    adv = ct.band_advice([(ks, ct.hm(x['ingame']) % 60, x.get('reset', 'A')) for ks, x in zip(ev, att)], 1700)
+    ss = ct.session_load(None); before = copy.deepcopy(ss)
+    ss.update(kenji_class=b['kenji'], X=b['X'], needs_calibration=False, timer_ms=1700, accuracy=3, lang='en')
+    ss.update(reset_rule=adv['rule'], k_plan=adv['k_plan'], p_band=adv['p_band'])
+    ss.setdefault('log', []).append(dict(event='calibration', attempts=len(att), kenji=b['kenji'], X=b['X'], rule=ss.get('reset_rule')))
+    out['calibrate'] = dict(before=before, after=ss, N=len(att))
+    # re-save gate on the core
+    R = random.Random(7)
+    Pfr = json.load(open('plan_fr_lp.json'))
+    Pen = json.load(open(os.path.join(OUT, 'plan.json')))['en_test']['plan']
+    saves = dict(victor=ct.sram_of(VICTOR_SAVE), en_test=ct.sram_of(EN_TEST_SAVE))
+    cases = [('victor', None), ('victor', 0), ('victor', 2), ('victor', 3), ('en_test', None), ('en_test', 2)]
+    moments = [(30, 12, 18, 117, 0), (30, 40, 9, 117, 0)]
+    for base, K in cases:
+        orig = Save(saves[base])
+        if K is not None:
+            orig.wr(0xdc58, K)
+        orig_b = orig.bytes()
+        lang, P, (d6, dy, fin) = ('fr', Pfr, PLAN1['fr']) if base == 'victor' else ('en', Pen, (0, -2, 1518))
+        for mom in moments:
+            g2lib._roms.clear()
+            sv = Save(orig_b)
+            g2lib.boot('fr', sv.bytes(), mom); ct.run_to(ct.Arr(ct.build(ct.plan_events(Pfr, 0, 0, 1933))), 900)
+            t2 = Save(sv.b)
+            for lo, hi, m, bk in SEG:
+                t2.wr(lo, bytes(g2lib.wram(a) for a in range(lo, hi)))
+            res = t2.bytes()
+            mini = read_minimal(Save(res))
+            rb = {c: apply_minimal(Save(orig_b), dict(mini, kenji=c)).bytes() for c in (1, 2)}
+            rows = []
+            for _ in range(20):
+                e1, e2, e3, X = (R.randint(-3, 3) for _ in range(4))
+                rtc = [R.randrange(60), R.randrange(60), R.randrange(24), R.randint(120, 139), 0]
+                j = shifted(ct.build(ct.plan_events(P, d6 + e1, dy + e2, fin + e3)), X)
+                row = dict(e=[e1, e2, e3], X=X, rtc=rtc)
+                for name, sb in (('truth', res), ('k1', rb[1]), ('k2', rb[2])):
+                    g2lib.boot(lang, sb, tuple(rtc)); h, r = g2lib.run(j, 4000); row[name] = h if r > 0 else None
+                rows.append(row)
+            same = {c: sum(r['k%d' % c] == r['truth'] for r in rows) for c in (1, 2)}
+            out['gate'].append(dict(save=base, K=K, moment=list(mom), lang=lang, plan1=[d6, dy, fin],
+                                    K_before=orig.rd(0xdc58)[0], K_after=Save(res).rd(0xdc58)[0], F=mini['F'], s=mini['playsec'],
+                                    reset_day=Save(res).rd(0xdc1d)[0], resaved=fnv64(res), rows=rows, same=same))
+            print(base, K, mom[:3], 'K', orig.rd(0xdc58)[0], '->', Save(res).rd(0xdc58)[0], 'rebuild k1 / k2', same[1], same[2])
+    dump('session.json', out)
+
+
+SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search, cal=sec_cal, switch=sec_switch, session=sec_session)
 if __name__ == '__main__':
     for s in sys.argv[1:] or SECTIONS:
         SECTIONS[s]()

@@ -25,6 +25,7 @@
 #include <Test/Gen2/CelebiCalibrationTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CelebiPlanTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CelebiSearchTest.hpp> // PokeFinderPlus
+#include <Test/Gen2/CelebiSessionTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CelebiSwitchRuleTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CrystalSaveTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/Gen2TestFiles.hpp> // PokeFinderPlus
@@ -111,6 +112,7 @@ int main()
     status += runTest<CelebiSearchTest>(fails);
     status += runTest<CelebiCalibrationTest>(fails);
     status += runTest<CelebiSwitchRuleTest>(fails);
+    status += runTest<CelebiSessionTest>(fails);
 
     // Gen 3
     status += runTest<EggGenerator3Test>(fails);
