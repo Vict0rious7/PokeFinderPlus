@@ -23,6 +23,7 @@
 #include <Core/Gen5/Keypresses.hpp>
 #include <Core/Gen5/Profile5.hpp>
 #include <Core/RNG/SHA1.hpp>
+#include <Core/RNG/SIMD.hpp> // PokeFinderPlus
 #include <Core/Util/DateTime.hpp>
 #include <QTest>
 #include <Test/Data.hpp>
@@ -257,6 +258,16 @@ void SHA1SSETest::hashTime()
     QCOMPARE(sha.hashSeed(beta), seed);
 }
 
+// PokeFinderPlus: on x86 the searchers only use SHA1SIMD when hasSHA() (SHA-NI); a CPU without it (CI's Intel macOS
+// runner) hits an illegal instruction in SHA1SIMD, so the SIMD tests are skipped there. ARM keeps them.
+#if defined(SIMD_X86)
+#define skipWithoutShaNi()                                                                                                             \
+    if (!hasSHA())                                                                                                                     \
+    QSKIP("this x86 CPU has no SHA extensions (the searchers use the plain SHA1 path)")
+#else
+#define skipWithoutShaNi()
+#endif
+
 void SHA1SIMDTest::hash_data()
 {
     QTest::addColumn<KeyPresses>("keypresses");
@@ -283,6 +294,7 @@ void SHA1SIMDTest::hash_data()
 
 void SHA1SIMDTest::hash()
 {
+    skipWithoutShaNi(); // PokeFinderPlus
     QFETCH(KeyPresses, keypresses);
     QFETCH(bool, skipLR);
     QFETCH(Game, version);
@@ -341,6 +353,7 @@ void SHA1SIMDTest::hashTime_data()
 
 void SHA1SIMDTest::hashTime()
 {
+    skipWithoutShaNi(); // PokeFinderPlus
     QFETCH(KeyPresses, keypresses);
     QFETCH(bool, skipLR);
     QFETCH(Game, version);

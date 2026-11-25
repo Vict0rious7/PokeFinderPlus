@@ -110,7 +110,7 @@ void CelebiSessionTest::fileRoundTrip()
     Session s = Session::fromJson(G()["resave"][0].back()["after"]);
     QString path = QDir::temp().filePath("pokefinderplus_gen2_session_test.json");
     sessionSave(path.toStdString(), s);
-    QCOMPARE(sessionLoad(path.toStdString()).toJson(), s.toJson());
+    QCOMPARE(sessionLoad(path.toStdString()).toJson().dump(), s.toJson().dump()); // strings: MSVC can't print json in QCOMPARE
     QFile::remove(path);
     QCOMPARE(sessionLoad("").toJson()["needs_calibration"].get<bool>(), true);
 }
