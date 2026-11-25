@@ -37,6 +37,8 @@ qt_add_executable(PokeFinderTest
     Gen2/Gen2TestFiles.hpp
     Gen2/VcCoreTest.cpp
     Gen2/VcCoreTest.hpp
+    Gen2/VcInputsTest.cpp
+    Gen2/VcInputsTest.hpp
     Gen3/EggGenerator3Test.cpp
     Gen3/EggGenerator3Test.hpp
     Gen3/GameCubeGeneratorTest.cpp

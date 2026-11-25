@@ -80,6 +80,8 @@ add_library(PokeFinderCore STATIC
     Gen2/CrystalSave.hpp
     Gen2/VcCore.cpp
     Gen2/VcCore.hpp
+    Gen2/VcInputs.cpp
+    Gen2/VcInputs.hpp
     Gen3/EncounterArea3.cpp
     Gen3/EncounterArea3.hpp
     Gen3/Encounters3.cpp

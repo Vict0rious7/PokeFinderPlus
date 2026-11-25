@@ -411,7 +411,62 @@ def sec_session():
     dump('session.json', out)
 
 
-SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search, cal=sec_cal, switch=sec_switch, session=sec_session)
+CIA_DIR = os.path.expanduser(os.environ.get('CELEBI_CIA_DIR', '~/Documents/Personnal/Games/Pokemon/Data/CIA'))
+FR_CIA = os.path.expanduser('~/Documents/Personnal/Games/Pokemon/Reference code/azahar-macos-universal-2126.2/'
+                            '0004000000172E00.00000002 Pok\u00e9mon Cristal (CTR-N-QBXA) (UE).standard.cia')
+
+
+def sec_inputs():
+    """Step 8: the prototype's vc_title_check.py on every CIA (decrypted: title ID, .code / config.ini / ROM / patch hashes,
+    verdict; encrypted: refused), and the ROM + own patch (fr/applypatch.py) of each title: its FNV must be the VC ROM the
+    goldens were made with. Hashes only."""
+    import glob, io, contextlib, subprocess, tempfile, unicodedata
+    sys.path.insert(0, os.path.join(WS, 'runs/t22/t22c'))
+    import vc_title_check as vt
+    core = json.load(open(os.path.join(OUT, 'core.json')))
+    files = [FR_CIA] + sorted(glob.glob(os.path.join(CIA_DIR, '**', '*.cia'), recursive=True))
+    out = dict(titles={}, encrypted=[])
+    for f in files:
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                vt.main(f)
+            refused = None
+        except SystemExit as e:
+            refused = str(e)
+        raw = open(f, 'rb').read()
+        if refused:
+            out['encrypted'].append(dict(head_fnv=fnv64(raw[:65536]), size=len(raw), message=refused))
+            continue
+        lines = buf.getvalue().splitlines()
+        tid = lines[0].split()[-1]
+        res = {}
+        for l in lines[1:]:
+            if l.startswith('VERDICT'):
+                continue
+            k = l[:32].strip(); v = l[32:].split()
+            res[k] = v[0]
+        rom_key = next(k for k in res if k.startswith('romfs rom/'))
+        code = rom_key.split('/')[-1]
+        # ROM + own patch, as the prototype built nin/roms/<lang>_vc.gbc
+        d = tempfile.mkdtemp()
+        subprocess.run([sys.executable, os.path.join(WS, 'fr/romfs.py'), f, d], check=True, capture_output=True)
+        subprocess.run([sys.executable, os.path.join(WS, 'fr/applypatch.py'), os.path.join(d, 'rom', code), os.path.join(d, code + '.patch'),
+                        os.path.join(d, 'out.gbc')], check=True, capture_output=True)
+        patched = open(os.path.join(d, 'out.gbc'), 'rb').read()
+        lang = dict(F='fr', D='de', S='es', I='it', E='en')[code[6]]
+        entry = dict(title_id=tid, code=res['code'], code_dec=res['code_dec'], config=res['config.ini'], rom_name='rom/' + code,
+                     rom_sha1=res[rom_key], patch_sha1=res['romfs %s.patch' % code], lang=lang, patched_fnv=fnv64(patched),
+                     golden_rom=core['roms'][lang], same=all(res.get(k) == vt.REF[k] for k in vt.REF))
+        assert entry['patched_fnv'] == entry['golden_rom'], (f, 'patched ROM is not the golden VC ROM')
+        out['titles'][tid] = entry
+        print(tid, lang, 'same emulator' if entry['same'] else 'DIFFERENT', 'patched = golden ROM')
+    print(len(out['encrypted']), 'encrypted CIA(s) refused')
+    dump('inputs.json', out)
+
+
+SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search, cal=sec_cal, switch=sec_switch, session=sec_session,
+                inputs=sec_inputs)
 if __name__ == '__main__':
     for s in sys.argv[1:] or SECTIONS:
         SECTIONS[s]()
