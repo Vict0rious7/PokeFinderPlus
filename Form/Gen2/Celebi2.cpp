@@ -272,20 +272,33 @@ QWidget *Celebi2::setupTab()
     auto *filesBox = new QGroupBox(tr("Game files (read on this computer only, never copied)"));
     auto *fl = new QVBoxLayout(filesBox);
     auto *fb = new QHBoxLayout;
-    auto *cia = new QPushButton(tr("Decrypted CIA… (recommended)"));
-    auto *romPatch = new QPushButton(tr("ROM + patch file…"));
-    auto *dump = new QPushButton(tr("Cartridge dump alone…"));
+    auto *romButton = new QPushButton(tr("ROM: .gbc (Recommended)…"));
+    auto *cia = new QPushButton(tr("Decrypted CIA…"));
+    romButton->setDefault(true);
+    romButton->setFocus();
+    connect(romButton, &QPushButton::clicked, this, [this] { loadFiles("rom"); });
     connect(cia, &QPushButton::clicked, this, [this] { loadFiles("cia"); });
-    connect(romPatch, &QPushButton::clicked, this, [this] { loadFiles("rom+patch"); });
-    connect(dump, &QPushButton::clicked, this, [this] { loadFiles("dump"); });
+    fb->addWidget(romButton);
     fb->addWidget(cia);
-    fb->addWidget(romPatch);
-    fb->addWidget(dump);
     fb->addStretch();
     fl->addLayout(fb);
     filesLabel = new QLabel(tr("No game files yet."));
     filesLabel->setWordWrap(true);
+    filesLabel->setTextFormat(Qt::RichText);
     fl->addWidget(filesLabel);
+    auto *langRow = new QFormLayout;
+    languageBox = new QComboBox;
+    languageBox->addItem(tr("Choose…"), QString());
+    for (const char *code : { "fr", "de", "it", "es", "en" })
+    {
+        languageBox->addItem(QString::fromStdString(languageName(code)), QString::fromLatin1(code));
+    }
+    connect(languageBox, &QComboBox::currentIndexChanged, this, [this] {
+        chosenLang = languageBox->currentData().toString();
+        refresh();
+    });
+    langRow->addRow(tr("Language of your title"), languageBox);
+    fl->addLayout(langRow);
     v->addWidget(filesBox);
 
     auto *opts = new QGroupBox(tr("What you read in your game"));
@@ -528,9 +541,16 @@ QWidget *Celebi2::helpTab()
 <h3>What you need</h3>
 <ul>
 <li>Pokémon Crystal on the 3DS Virtual Console, FR, DE, IT, ES or EN (JP is not supported).</li>
-<li>Your game files, read on this computer only: a <b>decrypted CIA</b> of your title (recommended: the tool checks the emulator),
-or the ROM and the title's patch file, or a cartridge dump of the same language. GodMode9 can make a decrypted CIA; a ".standard"
-CIA can still be encrypted, and the tool will say so.</li>
+<li><b>Your ROM</b> (.gbc), read on this computer only: a dump of Pokémon Crystal in your title's language. The tool recognises
+it and shows a check mark (✓ French, ✓ English Rev A, …). The ROM alone is enough: the Virtual Console patch never changes Celebi.
+Or a <b>decrypted CIA</b> of your VC title: the tool takes the ROM from inside it and also checks the emulator build.</li>
+<li><b>Only the VC title, no .gbc?</b> The ROM is inside the title's romfs, as <code>rom/&lt;code&gt;</code> (a file with no
+extension, for example <code>rom/CGBBYTF0.849</code> for French). With GodMode9 on your 3DS: open <i>[A:] SYSNAND SD</i> →
+<code>title</code> → <code>00040000</code> → your Crystal title's folder → <code>content</code>, press A on the <code>.app</code>
+file → <i>NCCH image options…</i> → <i>Mount image to drive</i>; open <code>romfs</code> → <code>rom</code>, press A on the
+file → <i>Copy to 0:/gm9/out</i>. On your computer, take that file from the SD card's <code>gm9/out</code> folder and choose it
+with <i>ROM: .gbc</i> (pick "All files" in the dialog, or rename it to .gbc). Or build a decrypted CIA in GodMode9 (press A on
+the title → <i>Build CIA (decrypted)</i>) and choose it with <i>Decrypted CIA</i>.</li>
 <li>PokeTimerPlus (3DS → Crystal VC Celebi), with your calibration in ms: the time from the Reset confirm to the game's first frame.</li>
 <li>A save on the tile below the shrine, facing it, walking (not on the bike), with the GS Ball in the bag (Kurt has given it back).
 Save once there. Don't save again during the hunt unless the tool tells you to re-save.</li>
@@ -622,41 +642,26 @@ void Celebi2::loadFiles(const QString &kind)
     {
         return;
     }
-    QStringList paths;
-    if (kind == "cia")
-    {
-        paths << QFileDialog::getOpenFileName(this, tr("Decrypted CIA of your Crystal VC title"), QString(), "CIA (*.cia);;All (*)");
-    }
-    else if (kind == "rom+patch")
-    {
-        paths << QFileDialog::getOpenFileName(this, tr("Cartridge dump (.gbc)"), QString(), "GBC ROM (*.gbc *.gb);;All (*)");
-        if (paths.back().isEmpty())
-        {
-            return;
-        }
-        paths << QFileDialog::getOpenFileName(this, tr("The title's patch file (CGBBYT*.*)"), QString(), "All (*)");
-    }
-    else
-    {
-        paths << QFileDialog::getOpenFileName(this, tr("Cartridge dump (.gbc)"), QString(), "GBC ROM (*.gbc *.gb);;All (*)");
-    }
-    if (paths.contains(QString()))
+    QString path = kind == "cia"
+        ? QFileDialog::getOpenFileName(this, tr("Decrypted CIA of your Crystal VC title"), QString(), "CIA (*.cia);;All (*)")
+        : QFileDialog::getOpenFileName(this, tr("Your Pokémon Crystal ROM"), QString(), tr("GBC ROM (*.gbc *.gb);;All files (*)"));
+    if (path.isEmpty())
     {
         return;
     }
     QString error;
-    if (!readFiles(kind, paths, error))
+    if (!readFiles(kind, { path }, error))
     {
         QMessageBox::warning(this, tr("Game files"), error);
         return;
     }
-    if (calResult || !calAttempts.empty())
+    if (files && files->known && chosenLang.isEmpty())
     {
-        if (files && plan && files->lang != plan->lang)
-        {
-            QMessageBox::information(this, tr("Game files"),
-                                     tr("These files are another language than this session: start a new session for them."));
-        }
+        languageBox->setCurrentIndex(languageBox->findData(QString::fromStdString(files->lang()))); // sets chosenLang
+    }
+    if ((calResult || !calAttempts.empty()) && files && plan && files->lang() != plan->lang)
+    {
+        QMessageBox::information(this, tr("Game files"), tr("This ROM is another language than this session: start a new session for it."));
     }
     save();
     refresh();
@@ -665,48 +670,52 @@ void Celebi2::loadFiles(const QString &kind)
 bool Celebi2::readFiles(const QString &kind, const QStringList &paths, QString &error)
 {
     bool ok = true;
-    std::pair<std::optional<GameFiles>, std::string> r;
+    Bytes b = readAll(paths.value(0), &ok);
+    if (!ok)
+    {
+        error = tr("Can't read %1.").arg(paths.value(0));
+        return false;
+    }
     if (kind == "cia")
     {
-        Bytes b = readAll(paths.value(0), &ok);
-        if (ok)
+        auto r = loadCia(b);
+        if (!r.first)
         {
-            r = loadCia(b);
+            error = QString::fromStdString(r.second);
+            return false;
         }
-    }
-    else if (kind == "rom+patch")
-    {
-        Bytes rom = readAll(paths.value(0), &ok);
-        bool ok2 = true;
-        Bytes patch = readAll(paths.value(1), &ok2);
-        ok = ok && ok2;
-        if (ok)
-        {
-            r = loadRomPatch(rom, std::string(patch.begin(), patch.end()));
-        }
+        files = r.first;
     }
     else
     {
-        Bytes rom = readAll(paths.value(0), &ok);
-        if (ok)
-        {
-            r = loadDump(rom);
-        }
+        files = loadRom(b);
     }
-    if (!ok)
-    {
-        error = tr("Can't read %1.").arg(paths.join(", "));
-        return false;
-    }
-    if (!r.first)
-    {
-        error = QString::fromStdString(r.second);
-        return false;
-    }
-    files = r.first;
     filesKind = kind;
-    filePaths = paths;
+    filePaths = { paths.value(0) };
     return true;
+}
+
+QString Celebi2::filesProblem() const
+{
+    if (!files)
+    {
+        return tr("Choose your ROM first.");
+    }
+    if (!files->known)
+    {
+        return tr("This isn't a Pokémon Crystal ROM the tool knows for a supported language (French, German, Italian, Spanish, "
+                  "English Rev 0 or Rev A). Check that you picked your title's ROM; the Japanese version isn't supported.");
+    }
+    if (chosenLang.isEmpty())
+    {
+        return tr("Choose the language of your title.");
+    }
+    if (QString::fromStdString(files->lang()) != chosenLang)
+    {
+        return tr("Your ROM is %1 but the language is set to %2: use the ROM of your title's language, or fix the setting.")
+            .arg(QString::fromStdString(files->known->language), QString::fromStdString(languageName(chosenLang.toStdString())));
+    }
+    return {};
 }
 
 void Celebi2::readOptions()
@@ -745,9 +754,9 @@ void Celebi2::startSession()
     {
         return;
     }
-    if (!files)
+    if (QString why = filesProblem(); !why.isEmpty())
     {
-        QMessageBox::information(this, tr("Setup"), tr("Choose your game files first."));
+        QMessageBox::information(this, tr("Setup"), why);
         return;
     }
     Visible before = visible;
@@ -775,7 +784,7 @@ void Celebi2::startSession()
     }
     RomPtr rom = files->rom;
     Visible vis = visible;
-    std::string lang = files->lang;
+    std::string lang = files->lang();
     auto result = std::make_shared<std::optional<Plan>>();
     run(
         tr("Finding the presses for your game"),
@@ -787,7 +796,7 @@ void Celebi2::startSession()
         [this, result] {
             plan = *result;
             updatePhases();
-            session.lang = files->lang;
+            session.lang = files->lang();
             session.accuracy = accuracy;
             session.timerMs = timerMs;
             tabs->setCurrentIndex(calResult && calResult->state == CalState::Accepted ? 2 : 1);
@@ -881,7 +890,7 @@ void Celebi2::runCalibration()
             const auto &r = *result;
             if (r.state == CalState::Accepted && !(r.band && r.band->more))
             {
-                sessionAfterCalibration(session, r.verdict, r.band, static_cast<int>(calAttempts.size()), timerMs, accuracy, files->lang);
+                sessionAfterCalibration(session, r.verdict, r.band, static_cast<int>(calAttempts.size()), timerMs, accuracy, files->lang());
                 int k = r.band && r.band->kPlan ? *r.band->kPlan : (r.verdict.best.carries.empty() ? 0 : r.verdict.best.carries[0]);
                 HuntSetup h = huntSetup(visible, r.verdict.best.kenji, k, r.hour, r.minute);
                 if (!setup || setup->kenji != h.kenji || setup->k != h.k || setup->hour != h.hour)
@@ -1207,7 +1216,7 @@ void Celebi2::sendPhases(int which, bool copyOnly)
         phMs << QString::number(std::lround(r.phase * 1000.0 / FPS));
     }
     QString name = which == 0 ? "calibration" : QString("plan%1").arg(which);
-    QString line = QString("celebi plan=%1 lang=%2 calibration=%3 phases=%4").arg(name, QString::fromStdString(files->lang)).arg(cal).arg(ph.join(","));
+    QString line = QString("celebi plan=%1 lang=%2 calibration=%3 phases=%4").arg(name, QString::fromStdString(files->lang())).arg(cal).arg(ph.join(","));
     QString human = tr("Crystal VC Celebi, %1: phases %2 frames at 59.8312 fps = %3 ms; calibration %4 ms on the first phase "
                        "(timer starts on the Reset confirm)")
                         .arg(which == 0 ? tr("calibration plan") : tr("plan %1").arg(which), ph.join(" / "), phMs.join(" / "))
@@ -1263,9 +1272,11 @@ json Celebi2::toJson() const
     j["accuracy"] = accuracy;
     j["timer_ms"] = timerMs;
     j["play_time"] = playTime.toStdString();
+    j["language"] = chosenLang.toStdString();
     if (files)
     {
-        j["files"] = { { "kind", filesKind.toStdString() }, { "lang", files->lang }, { "label", files->label },
+        j["files"] = { { "kind", filesKind.toStdString() }, { "lang", files->lang() },
+                       { "label", files->known ? files->known->label() : std::string("unknown ROM") },
                        { "same_emulator", files->sameEmulator } };
         json paths = json::array();
         for (const auto &p : filePaths)
@@ -1323,6 +1334,7 @@ void Celebi2::fromJson(const json &j)
     accuracy = j.value("accuracy", 3);
     timerMs = j.value("timer_ms", 0);
     playTime = QString::fromStdString(j.value("play_time", std::string()));
+    chosenLang = QString::fromStdString(j.value("language", j.contains("files") ? j["files"].value("lang", std::string()) : std::string()));
     calAttempts.clear();
     for (const auto &a : j.value("calibration_attempts", json::array()))
     {
@@ -1372,6 +1384,10 @@ void Celebi2::fromJson(const json &j)
     if (j.contains("files"))
     {
         filesKind = QString::fromStdString(j["files"].value("kind", std::string()));
+        if (filesKind != "cia")
+        {
+            filesKind = "rom"; // sessions from 4.4.2-plus.2: "dump" or "rom+patch" (its first file is the ROM)
+        }
         for (const auto &p : j["files"].value("paths", json::array()))
         {
             filePaths << QString::fromStdString(p.get<std::string>());
@@ -1391,6 +1407,11 @@ void Celebi2::fromJson(const json &j)
     swarm->setChecked(visible.swarm);
     lass->setChecked(visible.lass);
     accuracyBox->setCurrentIndex(accuracy == 2 ? 1 : 0);
+    {
+        QString keep = chosenLang;
+        languageBox->setCurrentIndex(std::max(0, languageBox->findData(keep)));
+        chosenLang = keep;
+    }
     timerMsBox->setValue(timerMs);
     playTimeEdit->setText(playTime);
     if (!huntAttempts.empty())
@@ -1404,7 +1425,7 @@ void Celebi2::fromJson(const json &j)
     {
         RomPtr rom = files->rom;
         Visible vis = visible;
-        std::string lang = files->lang;
+        std::string lang = files->lang();
         auto planOut = std::make_shared<std::optional<Plan>>();
         auto calOut = std::make_shared<std::optional<CalOutcome>>();
         auto cache = std::make_shared<GridCache>(calCache);
@@ -1562,12 +1583,30 @@ void Celebi2::refresh()
     {
         status->setText(sessionPath.isEmpty() ? QString() : tr("Session saved automatically."));
     }
-    filesLabel->setText(files ? tr("<b>%1</b> (language %2). %3")
-                                    .arg(esc(QString::fromStdString(files->label)), QString::fromStdString(files->lang).toUpper(),
-                                         esc(QString::fromStdString(files->titleCheck)))
-                              : tr("No game files yet."));
+    {
+        QString html;
+        if (!files)
+        {
+            html = tr("No game files yet. Your ROM is enough: the VC patch never changes Celebi.");
+        }
+        else if (files->known)
+        {
+            html = "<span style=\"color:#2e7d32\"><b>✓ " + esc(QString::fromStdString(files->known->label())) + "</b></span> "
+                + (files->kind == "cia" ? tr("(the ROM inside your CIA)") : tr("(ROM)"));
+            if (!files->titleCheck.empty())
+            {
+                html += "<br>" + esc(QString::fromStdString(files->titleCheck));
+            }
+        }
+        QString why = filesProblem();
+        if (files && !why.isEmpty())
+        {
+            html += (html.isEmpty() ? "" : "<br>") + QString("<span style=\"color:#c62828\"><b>⚠</b> ") + esc(why) + "</span>";
+        }
+        filesLabel->setText(html);
+    }
     sessionLabel->setText(tr("Session file: %1").arg(sessionPath));
-    start->setEnabled(!b && files.has_value());
+    start->setEnabled(!b && filesProblem().isEmpty());
     for (auto *w : std::initializer_list<QWidget *> { calAdd, calRemove, calRun, calNewRound, planRun, huntResave, huntRecal })
     {
         w->setEnabled(!b);

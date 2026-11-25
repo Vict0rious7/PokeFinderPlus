@@ -11,7 +11,9 @@
 #include <QFile>
 #include <QTest>
 #include <Test/Gen2/Gen2TestFiles.hpp>
+#include <cctype>
 #include <cstdlib>
+#include <set>
 
 using namespace Gen2;
 
@@ -42,20 +44,68 @@ void VcInputsTest::sha1()
     QCOMPARE(h(std::string(1000, 'a')), std::string("291e9a6c66994949b57ba5e650361e98fc36b1ba"));
 }
 
-void VcInputsTest::patchFormat()
+void VcInputsTest::knownRoms()
 {
-    // ROM-free: the VC patch format as the prototype's applypatch.py reads it (Mode 1 entries only; a<count>:<hex> or one byte)
-    Bytes rom(0x100, 0);
-    std::string p = "[Header]\nName=x\n[Fix 1]\nMode = 1 ; comment\nAddress=0x10\nFixcode=a3:AA BB CC DD\n"
-                    "[Fix 2]\r\nMode=2\r\nAddress=0x20\r\nFixcode=11\r\n[Fix 3]\nMode=1\nAddress=30\nFixcode=0x7f\n";
-    int n = 0;
-    Bytes out = applyPatch(rom, p, &n);
-    QCOMPARE(n, 2);
-    QCOMPARE(out[0x10], std::uint8_t(0xaa));
-    QCOMPARE(out[0x12], std::uint8_t(0xcc));
-    QCOMPARE(out[0x13], std::uint8_t(0));
-    QCOMPARE(out[0x20], std::uint8_t(0));
-    QCOMPARE(out[0x30], std::uint8_t(0x7f));
+    // ROM-free: the hash table (Data/ROMS, 2026-11-25) and its matching; JP is not in it
+    std::set<std::string> hashes, labels;
+    for (const auto &k : KNOWN_ROMS)
+    {
+        std::string h = k.sha1;
+        QCOMPARE(h.size(), std::size_t(40));
+        QVERIFY(h.find_first_not_of("0123456789abcdef") == std::string::npos);
+        hashes.insert(h);
+        labels.insert(k.label());
+        QCOMPARE(knownRomBySha1(h), &k);
+        std::string upper = h;
+        for (char &c : upper)
+        {
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        }
+        QCOMPARE(knownRomBySha1(upper), &k);
+        std::string off = h;
+        off[39] = off[39] == '0' ? '1' : '0';
+        QVERIFY(knownRomBySha1(off) == nullptr);
+    }
+    QCOMPARE(hashes.size(), std::size_t(6));
+    QVERIFY(labels == (std::set<std::string> { "French", "German", "Italian", "Spanish", "English Rev 0", "English Rev A" }));
+    QVERIFY(knownRomBySha1("95127b901bbce2407daf43cce9f45d4c27ef635d") == nullptr); // Japanese: not supported
+    QVERIFY(knownRomBySha1("") == nullptr);
+    QVERIFY(identifyRom(Bytes(0x200000, 0)) == nullptr);
+    QCOMPARE(languageName("de"), std::string("German"));
+    QCOMPARE(std::string(knownRomBySha1("f4cd194bdee0d04ca4eac29e09b8e4e9d818c133")->lang), std::string("en"));
+}
+
+void VcInputsTest::romCheckMarks()
+{
+    // every supported ROM in $POKEFINDERPLUS_GBC_ROMS gets its check mark; one byte changed, no check mark
+    std::map<std::string, std::string> found; // label -> sha1
+    for (const auto &[fnv, b] : Gen2Test::romFiles())
+    {
+        const KnownRom *k = identifyRom(*b);
+        if (!k)
+        {
+            continue;
+        }
+        found[k->label()] = k->sha1;
+        for (std::size_t at : { std::size_t(0), b->size() / 2, b->size() - 1 })
+        {
+            Bytes changed = *b;
+            changed[at] ^= 0x01;
+            QVERIFY2(identifyRom(changed) == nullptr, k->label().c_str());
+        }
+    }
+    if (found.empty())
+    {
+        Gen2Test::countSkip("VcInputsTest::romCheckMarks: no Crystal ROM in POKEFINDERPLUS_GBC_ROMS");
+        QSKIP("needs the Crystal ROMs (POKEFINDERPLUS_GBC_ROMS)");
+    }
+    QStringList l;
+    for (const auto &[label, h] : found)
+    {
+        l << QString::fromStdString(label);
+    }
+    qInfo("check marks: %s (each with one byte changed: none)", qPrintable(l.join(", ")));
+    QCOMPARE(found.size(), std::size_t(6));
 }
 
 void VcInputsTest::notACia()
@@ -109,17 +159,14 @@ void VcInputsTest::cias()
         QCOMPARE(t.configSha1, w["config"].get<std::string>());
         QCOMPARE(t.romName, w["rom_name"].get<std::string>());
         QCOMPARE(t.sameEmulator(), w["same"].get<bool>());
-        auto dumpB = t.dump();
-        QVERIFY(dumpB);
-        QCOMPARE(sha1Hex(*dumpB), w["rom_sha1"].get<std::string>());
-        auto id = identifyDump(*dumpB);
-        QVERIFY(id && id->first == w["lang"].get<std::string>()); // the ROM inside the title is the cartridge dump
-        QCOMPARE(sha1Hex(t.romfs.at(t.romName.substr(4) + ".patch")), w["patch_sha1"].get<std::string>());
-        auto patched = t.patchedRom();
-        QVERIFY(patched);
-        QCOMPARE(Gen2Test::fnv64(patched->data(), patched->size()), w["golden_rom"].get<std::string>());
-        qInfo("CIA %s (%s): .code / config.ini %s; ROM = %s; ROM + patch = the goldens' VC ROM", tid, w["lang"].get<std::string>().c_str(),
-              t.sameEmulator() ? "match the reference" : "DIFFERENT", id->second.c_str());
+        auto rom = t.rom();
+        QVERIFY(rom);
+        QCOMPARE(sha1Hex(*rom), w["rom_sha1"].get<std::string>());
+        const KnownRom *k = identifyRom(*rom); // the ROM inside the title gets the same check mark as a .gbc
+        QVERIFY(k && k->lang == w["lang"].get<std::string>());
+        QCOMPARE(t.romfs.size(), std::size_t(1)); // only the ROM is kept (no patch file)
+        qInfo("CIA %s (%s): .code / config.ini %s; ROM inside: check mark %s", tid, w["lang"].get<std::string>().c_str(),
+              t.sameEmulator() ? "match the reference" : "DIFFERENT", k->label().c_str());
         seen.insert(tid);
     }
     QCOMPARE(seen.size(), g["titles"].size());
@@ -128,48 +175,52 @@ void VcInputsTest::cias()
           ciaErrorText(CiaError::Encrypted).substr(0, 60).c_str());
 }
 
-void VcInputsTest::dumpAlone()
+void VcInputsTest::romsGiveVcCelebi()
 {
-    // a cartridge dump alone (no VC patch) gives the same Celebi as the VC ROM on 20 golden timelines per language
-    const char *dir = std::getenv("POKEFINDERPLUS_GEN2_CIAS");
+    // each supported ROM alone (no VC patch) gives the VC ROM's Celebi: 20 golden timelines per ROM, and all 400 EN timelines
+    // for EN Rev 0 (the VC title ships Rev A, so Rev 0 never ran in the core before)
     auto victor = Gen2Test::namedSave("victor");
     auto enTest = Gen2Test::namedSave("en_test");
-    if (!dir || !*dir || !victor || !enTest)
+    std::map<std::string, RomPtr> roms; // label -> ROM
+    std::map<std::string, std::string> langOf;
+    for (const auto &[fnv, b] : Gen2Test::romFiles())
     {
-        Gen2Test::countSkip("VcInputsTest::dumpAlone: needs the CIAs and the saves");
-        QSKIP("needs the CIAs and the saves");
-    }
-    std::map<std::string, RomPtr> dumps;
-    for (const QString &path : ciaFiles(dir))
-    {
-        QFile f(path);
-        f.open(QIODevice::ReadOnly);
-        QByteArray qb = f.readAll();
-        CiaTitle t = readCia(Bytes(qb.begin(), qb.end()));
-        if (t.error == CiaError::None)
+        if (const KnownRom *k = identifyRom(*b))
         {
-            auto d = t.dump();
-            dumps[identifyDump(*d)->first] = std::make_shared<Bytes>(*d);
+            roms[k->label()] = b;
+            langOf[k->label()] = k->lang;
         }
+    }
+    if (roms.empty() || !victor || !enTest)
+    {
+        Gen2Test::countSkip("VcInputsTest::romsGiveVcCelebi: needs the Crystal ROMs and the saves");
+        QSKIP("needs the Crystal ROMs (POKEFINDERPLUS_GBC_ROMS) and the saves");
     }
     const json &core = Gen2Test::golden("gen2_core.json");
-    std::map<std::string, int> per;
-    int n = 0, bad = 0;
     auto c = std::make_unique<VcCore>();
-    for (const auto &cs : core["cases"])
+    int total = 0, totalBad = 0;
+    for (const auto &[label, rom] : roms)
     {
-        std::string lang = cs["lang"].get<std::string>();
-        if (per[lang]++ >= 20 || !dumps.count(lang))
+        int n = 0, bad = 0, cap = label == "English Rev 0" ? 1000 : 20;
+        for (const auto &cs : core["cases"])
         {
-            continue;
+            if (cs["lang"].get<std::string>() != langOf[label] || n >= cap)
+            {
+                continue;
+            }
+            Bytes j = Gen2Test::joyFromRle(cs["joy"], cs["n"].get<int>());
+            boot(*c, rom, cs["save"] == "victor" ? *victor : *enTest, Gen2Test::rtcFromJson(cs["rtc"]));
+            RunResult r = run(*c, j);
+            bool same = cs["enemy"].is_null() ? r.ret <= 0 : (r.ret > 0 && Gen2::hex(*r.enemy) == cs["enemy"].get<std::string>());
+            bad += !same;
+            n++;
         }
-        Bytes j = Gen2Test::joyFromRle(cs["joy"], cs["n"].get<int>());
-        boot(*c, dumps[lang], cs["save"] == "victor" ? *victor : *enTest, Gen2Test::rtcFromJson(cs["rtc"]));
-        RunResult r = run(*c, j);
-        bad += !(r.ret > 0 && Gen2::hex(*r.enemy) == cs["enemy"].get<std::string>());
-        n++;
+        qInfo("%s alone: %d/%d timelines give the VC ROM's Celebi", label.c_str(), n - bad, n);
+        QVERIFY2(n > 0, label.c_str());
+        total += n;
+        totalBad += bad;
     }
-    qInfo("cartridge dump alone: %d/%d timelines give the VC ROM's Celebi", n - bad, n);
-    QCOMPARE(n, 100);
-    QCOMPARE(bad, 0);
+    QCOMPARE(totalBad, 0);
+    QCOMPARE(roms.size(), std::size_t(6));
+    QVERIFY(total >= 5 * 20 + 400);
 }

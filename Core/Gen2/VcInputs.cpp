@@ -89,22 +89,43 @@ namespace Gen2
         return out;
     }
 
-    std::optional<std::pair<std::string, std::string>> identifyDump(const Bytes &rom)
+    std::string KnownRom::label() const
     {
-        static const std::pair<const char *, std::pair<const char *, const char *>> CART[] = {
-            { "c055992b16b739", { "fr", "FR cartridge" } },    { "accb584293ba", { "de", "DE cartridge" } },
-            { "889a06fc0bb8", { "es", "ES cartridge" } },      { "6cee05e5b95b", { "it", "IT cartridge" } },
-            { "f2f52230b536", { "en", "EN Rev A cartridge" } },
-        };
-        std::string h = sha1Hex(rom);
-        for (const auto &[pre, v] : CART)
+        return *revision ? std::string(language) + " " + revision : std::string(language);
+    }
+
+    const KnownRom *knownRomBySha1(const std::string &sha1)
+    {
+        std::string h;
+        for (char c : sha1)
         {
-            if (h.starts_with(pre))
+            h += static_cast<char>(c >= 'A' && c <= 'F' ? c - 'A' + 'a' : c);
+        }
+        for (const auto &k : KNOWN_ROMS)
+        {
+            if (h == k.sha1)
             {
-                return std::pair(std::string(v.first), std::string(v.second));
+                return &k;
             }
         }
-        return std::nullopt;
+        return nullptr;
+    }
+
+    const KnownRom *identifyRom(const Bytes &rom)
+    {
+        return knownRomBySha1(sha1Hex(rom));
+    }
+
+    std::string languageName(const std::string &lang)
+    {
+        for (const auto &k : KNOWN_ROMS)
+        {
+            if (lang == k.lang)
+            {
+                return k.language;
+            }
+        }
+        return lang;
     }
 
     std::string ciaErrorText(CiaError e)
@@ -117,8 +138,8 @@ namespace Gen2
             return "This file is not a CIA.";
         case CiaError::Encrypted:
             return "This CIA is encrypted, so its files can't be read. Dump your Virtual Console title again as a decrypted CIA "
-                   "(GodMode9: \"Build CIA (decrypted)\"; a \".standard\" CIA can still be encrypted), or give the ROM and the "
-                   "title's patch file, or your cartridge dump.";
+                   "(GodMode9: \"Build CIA (decrypted)\"; a \".standard\" CIA can still be encrypted), or give the ROM alone "
+                   "(see Help: it is rom/<code> in the title's romfs).";
         case CiaError::NoRom:
             return "This CIA holds no Pokémon Crystal ROM.";
         }
@@ -163,21 +184,10 @@ namespace Gen2
         return error == CiaError::None && codeSha1 == VcRef::CODE && codeDecSha1 == VcRef::CODE_DEC && configSha1 == VcRef::CONFIG;
     }
 
-    std::optional<Bytes> CiaTitle::dump() const
+    std::optional<Bytes> CiaTitle::rom() const
     {
         auto it = romfs.find(romName);
         return it == romfs.end() ? std::nullopt : std::optional<Bytes>(it->second);
-    }
-
-    std::optional<Bytes> CiaTitle::patchedRom() const
-    {
-        auto rom = dump();
-        auto it = romfs.find(romName.substr(4) + ".patch");
-        if (!rom || it == romfs.end())
-        {
-            return std::nullopt;
-        }
-        return applyPatch(*rom, std::string(it->second.begin(), it->second.end()));
     }
 
     CiaTitle readCia(const Bytes &c)
@@ -251,13 +261,10 @@ namespace Gen2
                     {
                         t.configSha1 = sha1Hex(c.data() + at, dl);
                     }
-                    if (crystalFile(fnm))
+                    if (crystalFile(fnm) && d == "rom/")
                     {
                         t.romfs[d + fnm] = Bytes(c.begin() + at, c.begin() + at + dl);
-                        if (d == "rom/")
-                        {
-                            t.romName = d + fnm;
-                        }
+                        t.romName = d + fnm;
                     }
                     f = sib;
                 }
@@ -336,88 +343,5 @@ namespace Gen2
             }
         }
         return d;
-    }
-
-    Bytes applyPatch(const Bytes &rom, const std::string &text, int *applied)
-    {
-        Bytes out = rom;
-        int nApplied = 0;
-        // sections start with '[' at the beginning of a line (the prototype's re.split(r'^\[', txt, flags=re.M))
-        std::vector<std::string> secs;
-        std::size_t pos = 0;
-        std::vector<std::size_t> starts;
-        for (std::size_t i = 0; i < text.size(); i++)
-        {
-            if (text[i] == '[' && (i == 0 || text[i - 1] == '\n' || text[i - 1] == '\r'))
-            {
-                starts.push_back(i + 1);
-            }
-        }
-        for (std::size_t k = 0; k < starts.size(); k++)
-        {
-            std::size_t end = k + 1 < starts.size() ? starts[k + 1] - 1 : text.size();
-            secs.push_back(text.substr(starts[k], end - starts[k]));
-        }
-        (void)pos;
-        auto trim = [](std::string s) {
-            auto a = s.find_first_not_of(" \t\r\n\f\v");
-            auto b = s.find_last_not_of(" \t\r\n\f\v");
-            return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
-        };
-        for (const auto &s : secs)
-        {
-            std::map<std::string, std::string> body;
-            std::istringstream in(s);
-            std::string line;
-            std::getline(in, line); // "name]..."
-            while (std::getline(in, line))
-            {
-                line = trim(line.substr(0, line.find(';')));
-                auto eq = line.find('=');
-                if (eq != std::string::npos)
-                {
-                    body[trim(line.substr(0, eq))] = trim(line.substr(eq + 1));
-                }
-            }
-            if (body["Mode"] != "1")
-            {
-                continue;
-            }
-            std::size_t addr = std::stoul(body["Address"], nullptr, 16);
-            std::string fc = body["Fixcode"];
-            Bytes data;
-            if (!fc.empty() && (fc[0] == 'a' || fc[0] == 'A'))
-            {
-                auto colon = fc.find(':');
-                int cnt = std::stoi(fc.substr(1, colon - 1));
-                std::string hx;
-                for (char ch : fc.substr(colon + 1))
-                {
-                    if (ch != ' ')
-                    {
-                        hx += ch;
-                    }
-                }
-                for (std::size_t i = 0; i + 1 < hx.size() && static_cast<int>(data.size()) < cnt; i += 2)
-                {
-                    data.push_back(static_cast<std::uint8_t>(std::stoi(hx.substr(i, 2), nullptr, 16)));
-                }
-            }
-            else
-            {
-                data.push_back(static_cast<std::uint8_t>(std::stoul(fc, nullptr, 16)));
-            }
-            if (addr + data.size() > out.size())
-            {
-                throw std::out_of_range("patch address outside the ROM");
-            }
-            std::copy(data.begin(), data.end(), out.begin() + addr);
-            nApplied++;
-        }
-        if (applied)
-        {
-            *applied = nApplied;
-        }
-        return out;
     }
 }

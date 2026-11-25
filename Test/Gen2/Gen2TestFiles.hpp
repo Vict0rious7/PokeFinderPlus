@@ -31,8 +31,10 @@ namespace Gen2Test
     /// Golden file from the test resources (:/data/<name>).
     const json &golden(const std::string &name);
 
-    /// ROM whose FNV-1a 64 is fnvHex, from $POKEFINDERPLUS_GBC_ROMS; null when missing.
+    /// ROM whose FNV-1a 64 is fnvHex, from the $POKEFINDERPLUS_GBC_ROMS folders; null when missing.
     std::shared_ptr<const Bytes> rom(const std::string &fnvHex);
+    /// Every file of the $POKEFINDERPLUS_GBC_ROMS folders (several, separated by ':' or ';' on Windows), by FNV-1a 64.
+    const std::map<std::string, std::shared_ptr<const Bytes>> &romFiles();
     /// First 32 KB of the save whose first 32 KB hash to fnvHex, from $POKEFINDERPLUS_GEN2_SAVES; empty when missing.
     std::optional<Bytes> save(const std::string &fnvHex);
 

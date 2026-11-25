@@ -151,22 +151,14 @@ namespace Gen2
         return applyMinimal(tpl, m).bytes();
     }
 
-    namespace
+    GameFiles loadRom(const Bytes &rom)
     {
-        std::pair<std::optional<GameFiles>, std::string> fromDump(const Bytes &dump, RomPtr rom, const std::string &kind)
-        {
-            auto id = identifyDump(dump);
-            if (!id)
-            {
-                return { std::nullopt, "This is not a Pokémon Crystal dump the tool knows (FR, DE, IT, ES or EN Rev A cartridge)." };
-            }
-            GameFiles g;
-            g.rom = std::move(rom);
-            g.lang = id->first;
-            g.kind = kind;
-            g.label = id->second;
-            return { g, "" };
-        }
+        GameFiles g;
+        g.kind = "rom";
+        g.sha1 = sha1Hex(rom);
+        g.known = knownRomBySha1(g.sha1);
+        g.rom = std::make_shared<const Bytes>(rom);
+        return g;
     }
 
     std::pair<std::optional<GameFiles>, std::string> loadCia(const Bytes &cia)
@@ -176,44 +168,18 @@ namespace Gen2
         {
             return { std::nullopt, ciaErrorText(t.error) };
         }
-        auto dump = t.dump();
-        auto rom = t.patchedRom();
-        if (!dump || !rom)
+        auto rom = t.rom();
+        if (!rom)
         {
             return { std::nullopt, ciaErrorText(CiaError::NoRom) };
         }
-        auto r = fromDump(*dump, std::make_shared<const Bytes>(std::move(*rom)), "cia");
-        if (r.first)
-        {
-            r.first->sameEmulator = t.sameEmulator();
-            r.first->titleCheck = t.sameEmulator()
-                ? "VC emulator: the build the tool was made for (.code and config.ini match)."
-                : "VC emulator: NOT the build the tool was made for (.code or config.ini differ). Results may not hold; please "
-                  "report it.";
-            r.first->label += " (" + t.romName + " + its patch)";
-        }
-        return r;
-    }
-
-    std::pair<std::optional<GameFiles>, std::string> loadRomPatch(const Bytes &rom, const std::string &patch)
-    {
-        int applied = 0;
-        Bytes vc = applyPatch(rom, patch, &applied);
-        if (applied == 0)
-        {
-            return { std::nullopt, "The patch file applied nothing: is it the title's .patch file (CGBBYT*)?" };
-        }
-        auto r = fromDump(rom, std::make_shared<const Bytes>(std::move(vc)), "rom+patch");
-        if (r.first)
-        {
-            r.first->label += " + patch";
-        }
-        return r;
-    }
-
-    std::pair<std::optional<GameFiles>, std::string> loadDump(const Bytes &rom)
-    {
-        return fromDump(rom, std::make_shared<const Bytes>(rom), "dump");
+        GameFiles g = loadRom(*rom);
+        g.kind = "cia";
+        g.sameEmulator = t.sameEmulator();
+        g.titleCheck = t.sameEmulator()
+            ? "VC emulator: the build the tool was made for (.code and config.ini match)."
+            : "VC emulator: NOT the build the tool was made for (.code or config.ini differ). Results may not hold; please report it.";
+        return { g, "" };
     }
 
     // ------------------------------------------------------------------ attempts

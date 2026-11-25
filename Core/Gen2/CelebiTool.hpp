@@ -18,7 +18,7 @@
  *
  * PokeFinderPlus: new file. The Celebi tool's flow for the Gen 2 window, as the prototype's CLI chains it
  * (celebi_tool.py v0.6: makesave, plan, timer, calibrate, fsearch + pick, switchrule, resave): the shipped save template,
- * the player's game files, calibration with cached grids, the plans for the calibrated class, the switch-rule grids and
+ * the player's game files (a .gbc ROM or a decrypted CIA), calibration with cached grids, the plans for the calibrated class, the switch-rule grids and
  * the hunt advice. Long steps take a progress callback and a cancel flag; finished grids are kept so a step resumes.
  */
 
@@ -30,6 +30,7 @@
 #include <Core/Gen2/CelebiSearch.hpp>
 #include <Core/Gen2/CelebiSwitchRule.hpp>
 #include <Core/Gen2/CrystalSave.hpp>
+#include <Core/Gen2/VcInputs.hpp>
 #include <atomic>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -74,18 +75,21 @@ namespace Gen2
     struct GameFiles
     {
         RomPtr rom;
-        std::string lang; // fr, de, es, it, en
-        std::string kind; // "cia", "rom+patch", "dump"
-        std::string label; // what was recognised
+        std::string kind; // "rom" (.gbc) or "cia"
+        std::string sha1; // of the ROM
+        const KnownRom *known = nullptr; // null: not a Crystal ROM the tool knows (no check mark)
         std::string titleCheck; // CIA: the VC emulator check result
         bool sameEmulator = true;
+        std::string lang() const
+        {
+            return known ? known->lang : "";
+        }
     };
-    /// A decrypted CIA of the VC title; empty error string on success.
+    /// A .gbc ROM (recommended): recognised by its SHA-1. Unknown ROMs come back with known == null.
+    GameFiles loadRom(const Bytes &rom);
+    /// A decrypted CIA of the VC title: the ROM from romfs rom/<code> gets the same check, plus the title check. Empty
+    /// result + the reason when it can't be read (encrypted, not a CIA, no Crystal ROM).
     std::pair<std::optional<GameFiles>, std::string> loadCia(const Bytes &cia);
-    /// A cartridge dump and the title's patch file (text).
-    std::pair<std::optional<GameFiles>, std::string> loadRomPatch(const Bytes &rom, const std::string &patch);
-    /// A cartridge dump alone (the VC patch never matters on the shrine path).
-    std::pair<std::optional<GameFiles>, std::string> loadDump(const Bytes &rom);
 
     // ------------------------------------------------------------------ attempts
 

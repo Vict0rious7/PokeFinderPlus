@@ -33,8 +33,13 @@ namespace Gen2Test
             {
                 return out;
             }
-            QDir d(QString::fromLocal8Bit(dir));
-            for (const QFileInfo &fi : d.entryInfoList(QDir::Files))
+            // several folders separated by ':' (';' on Windows)
+            QFileInfoList list;
+            for (const QString &p : QString::fromLocal8Bit(dir).split(QDir::listSeparator(), Qt::SkipEmptyParts))
+            {
+                list += QDir(p).entryInfoList(QDir::Files);
+            }
+            for (const QFileInfo &fi : list)
             {
                 if (fi.size() > 4 * 1024 * 1024)
                 {
@@ -101,6 +106,21 @@ namespace Gen2Test
         auto &f = files("POKEFINDERPLUS_GBC_ROMS", SIZE_MAX);
         auto it = f.find(fnvHex);
         return it == f.end() ? nullptr : it->second;
+    }
+
+    const std::map<std::string, std::shared_ptr<const Bytes>> &romFiles()
+    {
+        static std::map<std::string, std::shared_ptr<const Bytes>> out;
+        static bool done = false;
+        if (!done)
+        {
+            for (const auto &[k, v] : files("POKEFINDERPLUS_GBC_ROMS", SIZE_MAX))
+            {
+                out[k] = v;
+            }
+            done = true;
+        }
+        return out;
     }
 
     std::optional<Bytes> save(const std::string &fnvHex)

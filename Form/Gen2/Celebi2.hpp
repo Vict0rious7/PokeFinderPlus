@@ -61,7 +61,8 @@ protected:
 private:
     // ---- state (saved in the session file)
     QString sessionPath;
-    QString filesKind; // cia, rom+patch, dump
+    QString filesKind; // rom (.gbc) or cia
+    QString chosenLang; // the language set in Setup (fr, de, it, es, en; empty = not chosen)
     QStringList filePaths;
     std::optional<Gen2::GameFiles> files;
     Gen2::Visible visible;
@@ -95,6 +96,7 @@ private:
 
     // setup
     QLabel *filesLabel;
+    QComboBox *languageBox;
     QComboBox *textSpeed, *sound, *accuracyBox;
     QSpinBox *frame, *timerMsBox;
     QCheckBox *raikou, *entei, *lass, *swarm;
@@ -158,6 +160,7 @@ private:
     // ---- helpers
     void run(const QString &name, std::function<void(const Gen2::Progress &, const Gen2::Cancel *)> work, std::function<void()> done);
     bool busy() const;
+    QString filesProblem() const; // why Start is refused for these files (unknown ROM, language mismatch); empty if fine
     void refresh();
     void refreshCal();
     void refreshPlans();
