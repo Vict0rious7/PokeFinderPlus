@@ -11,6 +11,7 @@
 #ifndef GEN2TESTFILES_HPP
 #define GEN2TESTFILES_HPP
 
+#include <Core/Gen2/CrystalSave.hpp>
 #include <Test/Data.hpp>
 #include <cstdint>
 #include <map>
@@ -40,6 +41,10 @@ namespace Gen2Test
 
     /// Joypad timeline from the golden run-length form [[start, end, mask], ...] over n VBlanks.
     Bytes joyFromRle(const json &rle, int n);
+
+    /// Minimal values from the prototype's read_minimal / apply_minimal dict.
+    Gen2::Minimal minimalFromJson(const json &m);
+    json minimalToJson(const Gen2::Minimal &m);
 }
 
 #endif // GEN2TESTFILES_HPP

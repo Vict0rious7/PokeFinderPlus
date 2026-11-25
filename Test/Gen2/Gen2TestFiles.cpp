@@ -147,4 +147,48 @@ namespace Gen2Test
         }
         return j;
     }
+
+    Gen2::Minimal minimalFromJson(const json &j)
+    {
+        Gen2::Minimal m;
+        static const std::map<std::string, Gen2::TextSpeed> TS = { { "instant", Gen2::TextSpeed::Instant },
+                                                                   { "fast", Gen2::TextSpeed::Fast },
+                                                                   { "mid", Gen2::TextSpeed::Mid },
+                                                                   { "slow", Gen2::TextSpeed::Slow } };
+        m.textSpeed = TS.at(j["textspeed"].get<std::string>());
+        m.stereo = j["sound"].get<std::string>() == "stereo";
+        m.frame = j["frame"].get<int>();
+        m.raikou = j["raikou"].get<bool>();
+        m.entei = j["entei"].get<bool>();
+        m.lass = j["lass"].get<bool>();
+        m.swarm = j["swarm"].get<bool>();
+        m.F = j["F"].get<int>();
+        m.playSec = j["playsec"].get<int>();
+        for (int i = 0; i < 4; i++)
+        {
+            m.start[i] = j["start"][i].get<int>();
+        }
+        m.setKenji = j.contains("kenji");
+        m.kenji = m.setKenji ? j["kenji"].get<int>() : 2;
+        return m;
+    }
+
+    json minimalToJson(const Gen2::Minimal &m)
+    {
+        json j = { { "textspeed", Gen2::textSpeedName(m.textSpeed) },
+                   { "sound", m.stereo ? "stereo" : "mono" },
+                   { "frame", m.frame },
+                   { "raikou", m.raikou },
+                   { "entei", m.entei },
+                   { "lass", m.lass },
+                   { "swarm", m.swarm },
+                   { "F", m.F },
+                   { "playsec", m.playSec },
+                   { "start", m.start } };
+        if (m.setKenji)
+        {
+            j["kenji"] = m.kenji;
+        }
+        return j;
+    }
 }

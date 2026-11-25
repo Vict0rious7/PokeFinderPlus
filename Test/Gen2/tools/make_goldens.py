@@ -101,7 +101,33 @@ def sec_core():
                            cases=cases, r8_13=r813))
 
 
-SECTIONS = dict(core=sec_core)
+def mini_json(m):
+    d = dict(m)
+    d['start'] = list(d['start'])
+    return d
+
+
+def sec_save():
+    """Step 2: apply_minimal on 50 random minimal-value sets (2 templates) -> FNV of the 32 KB; read_minimal round trip."""
+    from savetool import Save
+    from savebuild import apply_minimal, read_minimal
+    R = random.Random(2)
+    tpls = dict(victor=Save(ct.sram_of(VICTOR_SAVE)), en_test=Save(ct.sram_of(EN_TEST_SAVE)))
+    out = dict(templates={k: dict(fnv=fnv64(bytes(v.b)), minimal=mini_json(read_minimal(v))) for k, v in tpls.items()}, cases=[])
+    for i in range(50):
+        t = ('victor', 'en_test')[i % 2]
+        m = dict(textspeed=R.choice(('instant', 'fast', 'mid', 'slow')), sound=R.choice(('mono', 'stereo')), frame=R.randint(1, 8),
+                 raikou=R.random() < .5, entei=R.random() < .5, lass=R.random() < .7, swarm=R.random() < .3, F=R.randrange(60),
+                 playsec=R.randrange(60), start=(R.randrange(7), R.randrange(24), R.randrange(60), R.randrange(60)), kenji=R.choice((0, 1, 2)))
+        if i % 10 == 9:
+            del m['kenji']
+        s = apply_minimal(tpls[t], m)
+        b = s.bytes()
+        out['cases'].append(dict(template=t, minimal=mini_json(m), fnv=fnv64(b), readback=mini_json(read_minimal(Save(b)))))
+    dump('save.json', out)
+
+
+SECTIONS = dict(core=sec_core, save=sec_save)
 if __name__ == '__main__':
     for s in sys.argv[1:] or SECTIONS:
         SECTIONS[s]()
