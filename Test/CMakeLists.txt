@@ -21,6 +21,8 @@ qt_add_executable(PokeFinderTest
     Data.hpp
     ${PROJECT_RESOURCES}
     ${ENUM_HPP}
+    Gen2/CelebiCalibrationTest.cpp
+    Gen2/CelebiCalibrationTest.hpp
     Gen2/CelebiPlanTest.cpp
     Gen2/CelebiPlanTest.hpp
     Gen2/CelebiSearchTest.cpp

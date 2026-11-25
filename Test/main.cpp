@@ -22,6 +22,7 @@
 
 #include <QDebug>
 #include <QTest>
+#include <Test/Gen2/CelebiCalibrationTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CelebiPlanTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CelebiSearchTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CrystalSaveTest.hpp> // PokeFinderPlus
@@ -107,6 +108,7 @@ int main()
     status += runTest<CrystalSaveTest>(fails);
     status += runTest<CelebiPlanTest>(fails);
     status += runTest<CelebiSearchTest>(fails);
+    status += runTest<CelebiCalibrationTest>(fails);
 
     // Gen 3
     status += runTest<EggGenerator3Test>(fails);

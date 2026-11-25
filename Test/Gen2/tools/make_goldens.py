@@ -207,7 +207,59 @@ def sec_search():
     dump('search.json', out)
 
 
-SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search)
+def rank_json(rank):
+    return [dict(o, carries=list(o['carries']), errors=[[list(x) if isinstance(x, tuple) else x for x in e] for e in o['errors']]) for o in rank]
+
+
+def sec_cal():
+    """Step 5: calibration (cal_rank / cal_verdict / carry_evidence / band_advice) on Victor's retail calibrations (grids g23,
+    g18) and the EN harness block b5 (grids cal3_np20) at 6 / 8 / 10 attempts; band functions on 500 random observation sets.
+    The grids are stored filtered: only the leaves whose DV is a candidate of one of the case's attempts (all cal_rank reads)."""
+    cases = []
+    att5 = json.load(open(os.path.join(WS, 'runs/t25/h_b5/cal_attempts.json')))
+    specs = [('cal1', 'runs/t22/t3/g23', json.load(open(os.path.join(WS, 'runs/t22/t3/cal1.json'))), (3, 2)),
+             ('cal2', 'runs/t22/t3/g18', json.load(open(os.path.join(WS, 'runs/t22/t3/cal2.json'))), (3, 2))]
+    specs += [('b5_%d' % n, 'runs/t25/cal3_np20', att5[:n], (3,)) for n in (6, 8, 10)]
+    invs = {}
+    for name, gdir, att, Ds in specs:
+        if gdir not in invs:
+            invs[gdir] = ct.cal_index(os.path.join(WS, gdir))
+        inv = invs[gdir]
+        cands = {c for a in att for c in ct.dv_cands(tuple(a['stats']))}
+        hours = {ct.hm(a['ingame']) // 60 for a in att}
+        grid = [[ke, k, h, c, [list(x) for x in inv.get((ke, k, h, c), [])]] for ke in (1, 2) for k in range(4) for h in sorted(hours)
+                for c in sorted(cands) if (ke, k, h, c) in inv]
+        for D in Ds:
+            rank = ct.cal_rank(att, None, (1, 2), D, inv)
+            v = ct.cal_verdict(rank, len(att))
+            b = v['best']
+            ev = ct.carry_evidence(att, inv, b['kenji'], b['X'], D)
+            bands = {}
+            for tms in (0, 1700, 3000):
+                obs = [(ks, ct.hm(x['ingame']) % 60, x.get('reset', 'A')) for ks, x in zip(ev, att)]
+                a = ct.band_advice(obs, tms)
+                bands[str(tms)] = dict(a, post=[float('%.12g' % x) for x in ct.band_posterior(obs, tms)])
+            cases.append(dict(name=name, D=D, attempts=att, grid=grid, rank=rank_json(rank),
+                              verdict=dict(accepted=v['accepted'], best=rank_json([b])[0],
+                                           runner_up=rank_json([v['runner_up']])[0] if v['runner_up'] else None,
+                                           carries_best=[list(c) for c in v['carries_best']], carries_next=[list(c) for c in v['carries_next']]),
+                              evidence=[sorted(k) for k in ev], bands=bands))
+    R = random.Random(5)
+    band = []
+    for i in range(500):
+        tms = R.choice((0, 1700, 3000, R.randrange(0, 4000)))
+        obs = []
+        for _ in range(R.randint(1, 12)):
+            u = R.random()
+            k = R.randrange(4)
+            ks = set() if u < .08 else {0, 1, 2, 3} if u < .14 else {k} if u < .7 else {k, min(k + 1, 3)} if u < .9 else set(R.sample(range(4), R.randint(1, 3)))
+            obs.append((ks, R.randrange(60), 'B' if R.random() < .2 else 'A'))
+        a = ct.band_advice(obs, tms)
+        band.append(dict(tms=tms, obs=[[sorted(ks), m, r] for ks, m, r in obs], advice=a, post=[float('%.12g' % x) for x in ct.band_posterior(obs, tms)]))
+    dump('cal.json', dict(cases=cases, band=band))
+
+
+SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search, cal=sec_cal)
 if __name__ == '__main__':
     for s in sys.argv[1:] or SECTIONS:
         SECTIONS[s]()
