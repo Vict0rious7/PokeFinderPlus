@@ -18,6 +18,20 @@
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="0">
      <widget class="QTabWidget" name="tabWidget">
+      <widget class="QWidget" name="tabGen2">
+       <attribute name="title">
+        <string>Gen 2</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayoutGen2">
+        <item row="0" column="0">
+         <widget class="QPushButton" name="pushButtonCelebi2">
+          <property name="text">
+           <string>Celebi (Crystal VC)</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
       <widget class="QWidget" name="tabGen3">
        <attribute name="title">
         <string>Gen 3</string>

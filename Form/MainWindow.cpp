@@ -20,6 +20,7 @@
  * window title, About box and update check point to the fork; About credits the FRLG seed data.
  * 2026-11-07: Gen 6 tab (Static, Seed Finder) and Gen 6 profile manager.
  * 2026-11-08: update check compares the whole release tag (versions like 4.4.2-plus.1).
+ * 2026-11-25: Gen 2 tab, Celebi (Crystal VC) window.
  * 2026-11-12: Gen 6 IDs (X / Y) window. 2026-11-13: X/Y and OR/AS tabs, button "IDs" like the other generations.
  */
 
@@ -59,6 +60,7 @@
 #include <Form/Gen5/Tools/Phenomenon.hpp>
 #include <Form/Gen5/Tools/SHA1CacheFinder.hpp>
 #include <Form/Gen5/Wild5.hpp>
+#include <Form/Gen2/Celebi2.hpp> // PokeFinderPlus
 #include <Form/Gen6/IDs6.hpp> // PokeFinderPlus
 #include <Form/Gen6/Profile/ProfileManager6.hpp> // PokeFinderPlus
 #include <Form/Gen6/Static6.hpp> // PokeFinderPlus
@@ -137,6 +139,7 @@ MainWindow::MainWindow(bool profile, QWidget *parent) : QMainWindow(parent), ui(
     connect(ui->pushButtonStatic8, &QPushButton::clicked, this, &MainWindow::openStatic8);
     connect(ui->pushButtonStatic6, &QPushButton::clicked, this, &MainWindow::openStatic6); // PokeFinderPlus
     connect(ui->pushButtonSeedFinder6, &QPushButton::clicked, this, &MainWindow::openSeedFinder6); // PokeFinderPlus
+    connect(ui->pushButtonCelebi2, &QPushButton::clicked, this, &MainWindow::openCelebi2); // PokeFinderPlus
     connect(ui->pushButtonIDs6, &QPushButton::clicked, this, &MainWindow::openIDs6); // PokeFinderPlus
     connect(ui->pushButtonWild8, &QPushButton::clicked, this, &MainWindow::openWild8);
     connect(ui->pushButtonUnderground, &QPushButton::clicked, this, &MainWindow::openUnderground);
@@ -703,6 +706,13 @@ void MainWindow::openIDs8()
     }
     ids8->show();
     ids8->raise();
+}
+
+// PokeFinderPlus: Gen 2
+void MainWindow::openCelebi2() const
+{
+    auto *window = new Celebi2();
+    window->show();
 }
 
 // PokeFinderPlus: Gen 6

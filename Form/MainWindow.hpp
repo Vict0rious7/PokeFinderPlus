@@ -356,6 +356,7 @@ private slots:
     /**
      * @brief PokeFinderPlus: opens the XY IDs window (blinks to seed, IDs, handoff to PokeTimerPlus)
      */
+    void openCelebi2() const; // PokeFinderPlus
     void openIDs6() const;
 
     /**
