@@ -16,7 +16,7 @@ player's attempts and says when to switch plans, move the timer, re-save or reca
 | `CelebiSwitchRule` | Hunt advice: joint posterior over timer residual × play-time frame counter F (info-box press in the model). |
 | `CelebiSession` | Session state (the prototype's JSON) and the re-save step. |
 | `CelebiTool` | The flow the Gen 2 window runs, as the prototype's CLI chains it: the shipped save template, game-file loading, calibration with cached grids (resumable, cancellable), the plans for the calibrated class, the switch-rule grids and the hunt advice, session JSON helpers, grid files. |
-| `VcInputs` | The player's files: a decrypted CIA (ROM + the title's patch + the emulator check), ROM + patch, or a cartridge dump alone. An encrypted CIA is refused. |
+| `VcInputs` | The player's files: a .gbc ROM alone (recommended), recognised by its SHA-1 (`KNOWN_ROMS`: FR, DE, IT, ES, EN Rev 0, EN Rev A), or a decrypted CIA (the ROM from its romfs `rom/<code>` + the emulator check). An encrypted CIA is refused. No patch file is read: the VC patch never changes the encounter (test 4; Victor 2026-11-25). |
 
 ## Where the facts come from
 
@@ -32,7 +32,7 @@ player's attempts and says when to switch plans, move the timer, re-save or reca
 
 ## No game data
 
-No ROM, ROM bytes, `.code`, patch file or save is in this folder, in `Test/Gen2`, or in CI. The player's files are read
+No ROM, ROM bytes, `.code`, patch file or save is in this folder (only the ROMs' SHA-1), in `Test/Gen2`, or in CI. The player's files are read
 at run time, locally. Golden data holds outputs only: DVs, hashes, frame numbers, verdicts, posteriors.
 
 ## The save template
@@ -46,12 +46,12 @@ and the tool's plan discovery on it equals the prototype's plans for all five (`
 ## Tests
 
 `./build-mac.sh --test` runs the tests that need no game files (save format, calibration, band, switch rule, session,
-patch format). The tests that need game files read these environment variables and are skipped (and counted) when they
+ROM hash table). The tests that need game files read these environment variables and are skipped (and counted) when they
 are missing:
 
 | Variable | Contents |
 |---|---|
-| `POKEFINDERPLUS_GBC_ROMS` | folder with the VC ROMs (`<lang>_vc.gbc`: cartridge dump + the title's patch); files are recognised by hash, names don't matter |
+| `POKEFINDERPLUS_GBC_ROMS` | folders (`:`, `;` on Windows) with the VC ROMs the goldens were made with (`<lang>_vc.gbc`: dump + the title's patch) and the cartridge dumps (FR, DE, IT, ES, EN Rev 0, EN Rev A) for the check-mark and ROM-alone tests; files are recognised by hash, names don't matter |
 | `POKEFINDERPLUS_GEN2_SAVES` | folder with the saves the goldens were made with (Victor's save, the EN test save) |
 | `POKEFINDERPLUS_GEN2_CIAS` | folders with decrypted and encrypted CIAs, separated by `:` (`;` on Windows) |
 
