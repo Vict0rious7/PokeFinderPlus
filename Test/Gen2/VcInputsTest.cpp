@@ -17,11 +17,11 @@ using namespace Gen2;
 
 namespace
 {
-    /// every *.cia under the folders of $POKEFINDERPLUS_GEN2_CIAS (several folders separated by ':')
+    /// every *.cia under the folders of $POKEFINDERPLUS_GEN2_CIAS (several folders separated by ':', or ';' on Windows)
     QStringList ciaFiles(const char *env)
     {
         QStringList out;
-        for (const QString &d : QString::fromLocal8Bit(env).split(':', Qt::SkipEmptyParts))
+        for (const QString &d : QString::fromLocal8Bit(env).split(QDir::listSeparator(), Qt::SkipEmptyParts))
         {
             QDirIterator it(d, { "*.cia" }, QDir::Files, QDirIterator::Subdirectories);
             while (it.hasNext())

@@ -101,6 +101,28 @@ namespace Gen2
     /// The switch-rule grids: for each plan, F 0-59 at timer offset X.
     std::vector<FgridJob> fgridJobs(int nplans, int D = 2, int X = 0);
 
+    using Progress = std::function<void(int done, int total)>;
+
+    struct FsearchResult
+    {
+        std::vector<std::pair<std::string, std::vector<Hit>>> jobs; // committed jobs, in job order
+        int committed = 0, total = 0;
+        bool stopped = false; // the target was met
+        /// all hits in job-key order (the prototype's all_hits over a job directory)
+        std::vector<Hit> hits() const;
+    };
+    /**
+     * @brief fsearch on `threads` threads: jobs committed in job order; stops when plan 1 covers `target` F values and plans
+     * 1 + 2 together `unionTarget` (0 = ignore), as the prototype's fsearch. `done` holds jobs already computed (resume).
+     */
+    FsearchResult fsearch(const RomPtr &rom, const Bytes &sram, const Plan &p, const std::vector<FsJob> &jobs, int target, int unionTarget,
+                          int threads = 0, const Progress &progress = {},
+                          const std::map<std::string, std::vector<Hit>> &done = {});
+
+    /// The switch-rule grids of plans (each F 0-59) at timer offsets Xs, on `threads` threads: (plan, F, X) -> grid.
+    std::map<std::array<int, 3>, Grid> switchGrids(const RomPtr &rom, const Bytes &sram, const Plan &p, const std::vector<Hit> &plans, int D,
+                                                   const std::vector<int> &Xs, int threads = 0, const Progress &progress = {});
+
     /// Enemy bytes for each of the 1,440 chip minutes (seconds 30, day 117).
     std::vector<std::optional<Enemy>> sweep(const RomPtr &rom, const Bytes &sram, const Events &ev, int threads = 0);
     /// In-game windows ("hh:mm-hh:mm") where pred holds, for a clock offset in minutes.

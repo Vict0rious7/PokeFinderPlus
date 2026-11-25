@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>

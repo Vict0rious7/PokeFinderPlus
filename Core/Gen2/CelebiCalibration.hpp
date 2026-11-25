@@ -73,6 +73,9 @@ namespace Gen2
     /// (Kenji, k, hour, DV) -> leaves, over the calibration grids (cal_index).
     using CalIndex = std::map<CalKey, std::vector<Leaf>>;
     void calIndexAdd(CalIndex &inv, int kenji, int k, int hour, const Grid &g);
+    /// Computes the calibration grids of `jobs` (plan d6 / dyes / final) on `threads` threads and indexes them.
+    CalIndex calibrationIndex(const RomPtr &rom, const Plan &p, int d6, int dyes, int final, const std::vector<CalJob> &jobs, int threads = 0,
+                              const std::function<void(int, int)> &progress = {});
 
     struct Fit
     {

@@ -173,6 +173,28 @@ namespace Gen2
         }
     }
 
+    CalIndex calibrationIndex(const RomPtr &rom, const Plan &p, int d6, int dyes, int final, const std::vector<CalJob> &jobs, int threads,
+                              const std::function<void(int, int)> &progress)
+    {
+        std::vector<Grid> grids(jobs.size());
+        std::atomic<int> count { 0 };
+        parallelFor(static_cast<int>(jobs.size()), threads, [&](int i) {
+            const auto &j = jobs[i];
+            grids[i] = gridX(rom, j.sram, j.rtc, p, d6, dyes, final, j.X, j.D);
+            int c = ++count;
+            if (progress)
+            {
+                progress(c, static_cast<int>(jobs.size()));
+            }
+        });
+        CalIndex inv;
+        for (std::size_t i = 0; i < jobs.size(); i++)
+        {
+            calIndexAdd(inv, jobs[i].kenji, jobs[i].k, jobs[i].hour, grids[i]);
+        }
+        return inv;
+    }
+
     namespace
     {
         int maxAbsErr(const Leaf &x)

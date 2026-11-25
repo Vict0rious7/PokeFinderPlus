@@ -407,3 +407,92 @@ void CelebiSearchTest::sweeps()
         QCOMPARE(windows(res, hm(s["offset"].get<std::string>())), s["windows"].get<std::vector<std::string>>());
     }
 }
+
+void CelebiSearchTest::fsearchThreads()
+{
+    auto victor = Gen2Test::namedSave("victor");
+    auto rom = Gen2Test::langRom("es");
+    if (!victor || !rom)
+    {
+        Gen2Test::countSkip("CelebiSearchTest::fsearchThreads: no ES ROM or Victor's save");
+        QSKIP("needs the ES ROM and Victor's save");
+    }
+    // fs_es: the prototype stopped after 164 jobs (target 40; plans 1 + 2 union 52). Resume from its first 100 jobs (rebuilt
+    // from the stored hits), finish on all threads, and stop at the same job with the same hits.
+    const auto &P = G()["picks"]["es"];
+    Plan p = plan("es");
+    auto jobs = fsJobs(p, { rtcOfHHMM("1812"), rtcOfHHMM("2312") });
+    std::vector<Hit> want = hits("es");
+    std::map<std::string, std::vector<Hit>> done;
+    for (int i = 0; i < 100; i++)
+    {
+        const auto &j = jobs[i];
+        auto &v = done[j.key];
+        for (const auto &h : want)
+        {
+            if (h.d6 == j.d6 && h.dyes == j.dyes && h.final >= j.lo && h.final < j.hi && h.rtc == j.rtc)
+            {
+                v.push_back(h);
+            }
+        }
+    }
+    int calls = 0;
+    FsearchResult r = fsearch(rom, *victor, p, jobs, 40, 52, 0, [&](int, int) { calls++; }, done);
+    QVERIFY(r.stopped);
+    QCOMPARE(r.committed, static_cast<int>(P["keys"].size()));
+    QCOMPARE(calls, r.committed - 100);
+    std::vector<std::string> keys;
+    for (const auto &j : r.jobs)
+    {
+        keys.push_back(j.first);
+    }
+    std::sort(keys.begin(), keys.end());
+    QCOMPARE(keys, P["keys"].get<std::vector<std::string>>());
+    QVERIFY(r.hits() == want);
+    qInfo("fsearch on all threads, resumed at 100: stopped after %d of %d jobs, as the prototype; same hits", r.committed, r.total);
+}
+
+void CelebiSearchTest::calibrationThreads()
+{
+    auto victor = Gen2Test::namedSave("victor");
+    auto rom = Gen2Test::langRom("fr");
+    if (!victor || !rom)
+    {
+        Gen2Test::countSkip("CelebiSearchTest::calibrationThreads: no FR ROM or Victor's save");
+        QSKIP("needs the FR ROM and Victor's save");
+    }
+    CrystalSave tpl(*victor);
+    std::vector<Attempt> att(1);
+    att[0].ingame = "20:30";
+    auto all = calJobs(tpl, readMinimal(tpl), att, { 1, 2 }, -40, 40, 3);
+    std::vector<CalJob> jobs;
+    CalIndex want;
+    auto [p1, p2] = plans12("fr");
+    for (const auto &g : G()["grids"])
+    {
+        if (g["set"] != "cal3_fr")
+        {
+            continue;
+        }
+        for (const auto &j : all)
+        {
+            if (j.key == g["key"].get<std::string>())
+            {
+                jobs.push_back(j);
+                Grid gr;
+                gr.X = j.X;
+                gr.D = g["D"].get<int>();
+                std::string s = g["leaves"].get<std::string>();
+                for (std::size_t i = 0; i < s.size(); i += 4)
+                {
+                    gr.dv.push_back(static_cast<std::uint16_t>(std::stoi(s.substr(i, 4), nullptr, 16)));
+                }
+                calIndexAdd(want, j.kenji, j.k, j.hour, gr);
+            }
+        }
+    }
+    QCOMPARE(jobs.size(), std::size_t(20));
+    CalIndex got = calibrationIndex(rom, plan("fr"), 0, 0, p1.final, jobs);
+    QVERIFY(got == want);
+    qInfo("calibration index on all threads: 20 cal3_fr jobs identical to the prototype's grids");
+}

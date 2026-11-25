@@ -310,4 +310,119 @@ namespace Gen2
         }
         return s;
     }
+
+    std::vector<Hit> FsearchResult::hits() const
+    {
+        std::vector<const std::pair<std::string, std::vector<Hit>> *> v;
+        for (const auto &j : jobs)
+        {
+            v.push_back(&j);
+        }
+        std::sort(v.begin(), v.end(), [](auto a, auto b) { return a->first < b->first; });
+        std::vector<Hit> out;
+        for (auto j : v)
+        {
+            out.insert(out.end(), j->second.begin(), j->second.end());
+        }
+        return out;
+    }
+
+    FsearchResult fsearch(const RomPtr &rom, const Bytes &sram, const Plan &p, const std::vector<FsJob> &jobs, int target, int unionTarget,
+                          int threads, const Progress &progress, const std::map<std::string, std::vector<Hit>> &done)
+    {
+        FsearchResult res;
+        res.total = static_cast<int>(jobs.size());
+        std::map<std::string, std::vector<Hit>> all = done; // by key: the prototype's job directory
+        auto met = [&] {
+            std::vector<Hit> hits;
+            for (const auto &[k, v] : all)
+            {
+                hits.insert(hits.end(), v.begin(), v.end());
+            }
+            auto [a, b] = pick(hits);
+            if (!a || static_cast<int>(hits[*a].fOk.size()) < target)
+            {
+                return false;
+            }
+            if (!unionTarget)
+            {
+                return true;
+            }
+            if (!b)
+            {
+                return false;
+            }
+            std::set<int> u(hits[*a].fOk.begin(), hits[*a].fOk.end());
+            u.insert(hits[*b].fOk.begin(), hits[*b].fOk.end());
+            return static_cast<int>(u.size()) >= unionTarget;
+        };
+        for (const auto &j : jobs)
+        {
+            if (done.count(j.key))
+            {
+                res.jobs.emplace_back(j.key, done.at(j.key));
+            }
+        }
+        if (!done.empty() && met())
+        {
+            res.committed = static_cast<int>(res.jobs.size());
+            res.stopped = true;
+            return res;
+        }
+        std::vector<int> todo;
+        for (int i = 0; i < res.total; i++)
+        {
+            if (!done.count(jobs[i].key))
+            {
+                todo.push_back(i);
+            }
+        }
+        std::vector<std::optional<std::vector<Hit>>> out;
+        int n = runJobsOrdered<std::vector<Hit>>(
+            static_cast<int>(todo.size()), threads, [&](int i) { return fsJob(rom, sram, p, jobs[todo[i]]); }, out,
+            [&](int i) {
+                const auto &job = jobs[todo[i]];
+                all[job.key] = *out[i];
+                res.jobs.emplace_back(job.key, *out[i]);
+                if (progress)
+                {
+                    progress(static_cast<int>(res.jobs.size()), res.total);
+                }
+                bool stop = !out[i]->empty() && met();
+                res.stopped = res.stopped || stop;
+                return stop;
+            });
+        (void)n;
+        res.committed = static_cast<int>(res.jobs.size());
+        return res;
+    }
+
+    std::map<std::array<int, 3>, Grid> switchGrids(const RomPtr &rom, const Bytes &sram, const Plan &p, const std::vector<Hit> &plans, int D,
+                                                   const std::vector<int> &Xs, int threads, const Progress &progress)
+    {
+        std::vector<FgridJob> jobs;
+        for (int X : Xs)
+        {
+            auto v = fgridJobs(static_cast<int>(plans.size()), D, X);
+            jobs.insert(jobs.end(), v.begin(), v.end());
+        }
+        std::vector<Grid> grids(jobs.size());
+        std::atomic<int> count { 0 };
+        parallelFor(static_cast<int>(jobs.size()), threads, [&](int i) {
+            const auto &j = jobs[i];
+            const Hit &h = plans[j.plan];
+            grids[i] = fgridJob(rom, sram, p, h.d6, h.dyes, h.final, h.rtc, j.F, j.D, j.X);
+            int c = ++count;
+            if (progress)
+            {
+                progress(c, static_cast<int>(jobs.size()));
+            }
+        });
+        std::map<std::array<int, 3>, Grid> out;
+        for (std::size_t i = 0; i < jobs.size(); i++)
+        {
+            out[{ jobs[i].plan, jobs[i].F, jobs[i].X }] = std::move(grids[i]);
+        }
+        return out;
+    }
 }
