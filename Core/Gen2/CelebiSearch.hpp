@@ -117,7 +117,7 @@ namespace Gen2
      */
     FsearchResult fsearch(const RomPtr &rom, const Bytes &sram, const Plan &p, const std::vector<FsJob> &jobs, int target, int unionTarget,
                           int threads = 0, const Progress &progress = {},
-                          const std::map<std::string, std::vector<Hit>> &done = {});
+                          const std::map<std::string, std::vector<Hit>> &done = {}, const std::atomic<bool> *cancel = nullptr);
 
     /// The switch-rule grids of plans (each F 0-59) at timer offsets Xs, on `threads` threads: (plan, F, X) -> grid.
     std::map<std::array<int, 3>, Grid> switchGrids(const RomPtr &rom, const Bytes &sram, const Plan &p, const std::vector<Hit> &plans, int D,

@@ -27,6 +27,7 @@
 #include <Test/Gen2/CelebiSearchTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CelebiSessionTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CelebiSwitchRuleTest.hpp> // PokeFinderPlus
+#include <Test/Gen2/CelebiToolTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/CrystalSaveTest.hpp> // PokeFinderPlus
 #include <Test/Gen2/Gen2TestFiles.hpp> // PokeFinderPlus
 #include <Test/Gen2/VcCoreTest.hpp> // PokeFinderPlus
@@ -91,6 +92,12 @@ template <class Testname>
 int runTest(QStringList &fails)
 {
     Testname test;
+    // PokeFinderPlus: POKEFINDERPLUS_TEST_ONLY=<class>[,<class>] runs only those test classes
+    const QString only = qEnvironmentVariable("POKEFINDERPLUS_TEST_ONLY");
+    if (!only.isEmpty() && !only.split(',').contains(test.metaObject()->className()))
+    {
+        return 0;
+    }
 
     int ret = QTest::qExec(&test);
     if (ret != 0)
@@ -115,6 +122,7 @@ int main()
     status += runTest<CelebiSwitchRuleTest>(fails);
     status += runTest<CelebiSessionTest>(fails);
     status += runTest<VcInputsTest>(fails);
+    status += runTest<CelebiToolTest>(fails);
 
     // Gen 3
     status += runTest<EggGenerator3Test>(fails);

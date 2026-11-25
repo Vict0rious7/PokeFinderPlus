@@ -4,6 +4,7 @@ import argparse
 import os
 
 from Embed.embed_frlg import embed_frlg  # PokeFinderPlus
+from Embed.embed_gen2 import embed_gen2  # PokeFinderPlus
 from Embed.embed_gen3 import embed_encounters3
 from Embed.embed_gen4 import embed_encounters4
 from Embed.embed_gen5 import embed_encounters5
@@ -29,6 +30,7 @@ def main():
     embed_personal(SCRIPT_FOLDER, args.output_dir)
     embed_strings(SCRIPT_FOLDER, args.output_dir)
     embed_frlg(SCRIPT_FOLDER, args.output_dir)  # PokeFinderPlus
+    embed_gen2(SCRIPT_FOLDER, args.output_dir)  # PokeFinderPlus
 
 
 if __name__ == "__main__":

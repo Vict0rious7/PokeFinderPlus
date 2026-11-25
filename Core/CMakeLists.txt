@@ -29,7 +29,7 @@ file(GLOB_RECURSE ALL_EMBED_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Resources/*)
 list(FILTER ALL_EMBED_FILES EXCLUDE REGEX "/EncounterTables/")
 
 set(EMBED_DATA_FILES ${ALL_EMBED_FILES})
-list(FILTER EMBED_DATA_FILES INCLUDE REGEX "\\.(bin|txt)$")
+list(FILTER EMBED_DATA_FILES INCLUDE REGEX "\\.(bin|txt|sav)$")
 
 set(EMBED_PYTHON_FILES ${ALL_EMBED_FILES})
 list(FILTER EMBED_PYTHON_FILES INCLUDE REGEX "\\.py$")
@@ -41,6 +41,7 @@ set(EMBED_HEADERS
     ${EMBED_PATH}/EncounterData5.hpp
     ${EMBED_PATH}/EncounterData8.hpp
     ${EMBED_PATH}/FRLGSeeds.hpp
+    ${EMBED_PATH}/Gen2Template.hpp
     ${EMBED_PATH}/i18n.hpp
     ${EMBED_PATH}/Personal.hpp
 )
@@ -76,6 +77,8 @@ add_library(PokeFinderCore STATIC
     Gen2/CelebiSession.hpp
     Gen2/CelebiSwitchRule.cpp
     Gen2/CelebiSwitchRule.hpp
+    Gen2/CelebiTool.cpp
+    Gen2/CelebiTool.hpp
     Gen2/CrystalSave.cpp
     Gen2/CrystalSave.hpp
     Gen2/VcCore.cpp

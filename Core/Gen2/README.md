@@ -2,8 +2,7 @@
 
 The engine behind PokeFinderPlus's Gen 2 tool: it plans the presses that give a shiny Celebi at the Ilex Forest shrine
 in the 3DS Virtual Console release of Pokémon Crystal (FR, DE, IT, ES, EN). It also infers the hidden values from the
-player's attempts and says when to switch plans, move the timer, re-save or recalibrate. This folder has no UI; the
-Gen 2 tab comes later.
+player's attempts and says when to switch plans, move the timer, re-save or recalibrate. The window is `Form/Gen2/Celebi2`.
 
 ## What is here
 
@@ -16,6 +15,7 @@ Gen 2 tab comes later.
 | `CelebiCalibration` | Calibration from attempts (timer offset X, Kenji class, clock carries; accept rule) and the reset band (rule A / B). |
 | `CelebiSwitchRule` | Hunt advice: joint posterior over timer residual × play-time frame counter F (info-box press in the model). |
 | `CelebiSession` | Session state (the prototype's JSON) and the re-save step. |
+| `CelebiTool` | The flow the Gen 2 window runs, as the prototype's CLI chains it: the shipped save template, game-file loading, calibration with cached grids (resumable, cancellable), the plans for the calibrated class, the switch-rule grids and the hunt advice, session JSON helpers, grid files. |
 | `VcInputs` | The player's files: a decrypted CIA (ROM + the title's patch + the emulator check), ROM + patch, or a cartridge dump alone. An encrypted CIA is refused. |
 
 ## Where the facts come from
@@ -35,6 +35,14 @@ Gen 2 tab comes later.
 No ROM, ROM bytes, `.code`, patch file or save is in this folder, in `Test/Gen2`, or in CI. The player's files are read
 at run time, locally. Golden data holds outputs only: DVs, hashes, frame numbers, verdicts, posteriors.
 
+## The save template
+
+`Core/Resources/Gen2/crystal_template.sav` is Victor's shrine save (FR) with every name and the trainer ID blanked
+(`make_template.py` says what is changed). The tool writes the player's visible values and the hypotheses (Kenji class,
+clock offset) into it; F and the play-time seconds stay the template's. Gate (2026-11-25, prototype core): the template
+gives the same Celebi as the original save on 500/500 random timelines and minimal-value sets across the five languages,
+and the tool's plan discovery on it equals the prototype's plans for all five (`CelebiToolTest::plansFromTemplate`).
+
 ## Tests
 
 `./build-mac.sh --test` runs the tests that need no game files (save format, calibration, band, switch rule, session,
@@ -47,4 +55,6 @@ are missing:
 | `POKEFINDERPLUS_GEN2_SAVES` | folder with the saves the goldens were made with (Victor's save, the EN test save) |
 | `POKEFINDERPLUS_GEN2_CIAS` | folders with decrypted and encrypted CIAs, separated by `:` (`;` on Windows) |
 
-With all three set, the Gen 2 tests take ~8 minutes on an M2.
+With all three set, the Gen 2 tests take ~8 minutes on an M2. `POKEFINDERPLUS_GEN2_SLOW=1` adds
+`CelebiToolTest::calibrationEndToEnd` (~17 min; also set `QTEST_FUNCTION_TIMEOUT=3600000`, Qt Test stops a function after 5 min by default): Victor's retail calibration 1 through the tool's own calibration path.
+`POKEFINDERPLUS_TEST_ONLY=<class>[,<class>]` runs only those test classes.

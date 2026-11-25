@@ -29,6 +29,8 @@ qt_add_executable(PokeFinderTest
     Gen2/CelebiSearchTest.hpp
     Gen2/CelebiSessionTest.cpp
     Gen2/CelebiSessionTest.hpp
+    Gen2/CelebiToolTest.cpp
+    Gen2/CelebiToolTest.hpp
     Gen2/CelebiSwitchRuleTest.cpp
     Gen2/CelebiSwitchRuleTest.hpp
     Gen2/CrystalSaveTest.cpp

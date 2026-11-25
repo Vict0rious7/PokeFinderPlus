@@ -328,7 +328,8 @@ namespace Gen2
     }
 
     FsearchResult fsearch(const RomPtr &rom, const Bytes &sram, const Plan &p, const std::vector<FsJob> &jobs, int target, int unionTarget,
-                          int threads, const Progress &progress, const std::map<std::string, std::vector<Hit>> &done)
+                          int threads, const Progress &progress, const std::map<std::string, std::vector<Hit>> &done,
+                          const std::atomic<bool> *cancel)
     {
         FsearchResult res;
         res.total = static_cast<int>(jobs.size());
@@ -390,7 +391,7 @@ namespace Gen2
                 }
                 bool stop = !out[i]->empty() && met();
                 res.stopped = res.stopped || stop;
-                return stop;
+                return stop || (cancel && cancel->load()); // cancel: keep what is committed (resume with `done`)
             });
         (void)n;
         res.committed = static_cast<int>(res.jobs.size());
