@@ -127,7 +127,30 @@ def sec_save():
     dump('save.json', out)
 
 
-SECTIONS = dict(core=sec_core, save=sec_save)
+# plan 2 of record per language (SPEC v0.6 section 3.2)
+PLAN2 = dict(fr=(1, -1, 1933), de=(-2, 1, 1933), es=(0, 0, 1505), en=(-1, 0, 2994), it=(-1, -2, 2641))
+
+
+def sec_plan():
+    """Step 3: the stored plan_<lang>_lp.json (Victor's save; discovered at chip 18:12:30 = in-game 20:30 with offset 2:18,
+    and the same at chip 20:30:30) and the prototype's timer rows for plans 1 and 2 (rtc 18:12:30 day 117)."""
+    sram = ct.sram_of(VICTOR_SAVE)
+    out = dict(rtcs=[[30, 12, 18, 117, 0], [30, 30, 20, 117, 0]], plans={}, timers=[])
+    for lang in LANGS:
+        P = json.load(open('plan_%s_lp.json' % lang))
+        out['plans'][lang] = P
+        for i, (d6, dy, fin) in enumerate((PLAN1[lang], PLAN2[lang])):
+            g2lib._roms.clear()
+            rows = ct.timer(lang, sram, P, d6, dy, fin)
+            out['timers'].append(dict(lang=lang, plan=i + 1, d6=d6, dyes=dy, final=fin, rows=rows))
+    # the EN test save, discovered by the prototype at chip 20:30:30 (np/plan_en_np.json is from another save / clock)
+    P = ct.discover('en', ct.sram_of(EN_TEST_SAVE), (30, 30, 20, 117, 0))
+    P['events'] = [list(e) for e in P['events']]
+    out['en_test'] = dict(rtc=[30, 30, 20, 117, 0], plan=P)
+    dump('plan.json', out)
+
+
+SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan)
 if __name__ == '__main__':
     for s in sys.argv[1:] or SECTIONS:
         SECTIONS[s]()

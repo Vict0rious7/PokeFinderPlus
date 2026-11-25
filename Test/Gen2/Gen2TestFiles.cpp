@@ -191,4 +191,67 @@ namespace Gen2Test
         }
         return j;
     }
+
+    Gen2::Plan planFromJson(const json &j)
+    {
+        Gen2::Plan p;
+        p.lang = j.value("lang", "");
+        for (const auto &e : j["events"])
+        {
+            p.events.push_back({ e[0].get<int>(), e[1].get<int>(), e[2].get<std::uint8_t>() });
+        }
+        for (const auto &q : j["presses"])
+        {
+            Gen2::Press pr { q["earliest"].get<int>(), std::nullopt, std::nullopt };
+            if (q.contains("press"))
+            {
+                pr.press = q["press"].get<int>();
+            }
+            if (q.contains("final_min"))
+            {
+                pr.finalMin = q["final_min"].get<int>();
+            }
+            p.presses.push_back(pr);
+        }
+        p.finalMin = j["final_min"].get<int>();
+        return p;
+    }
+
+    json planToJson(const Gen2::Plan &p)
+    {
+        json j = { { "lang", p.lang }, { "final_min", p.finalMin }, { "events", json::array() }, { "presses", json::array() } };
+        for (const auto &e : p.events)
+        {
+            j["events"].push_back({ e.start, e.end, e.mask });
+        }
+        for (const auto &q : p.presses)
+        {
+            json o = { { "earliest", q.earliest } };
+            if (q.press)
+            {
+                o["press"] = *q.press;
+            }
+            if (q.finalMin)
+            {
+                o["final_min"] = *q.finalMin;
+            }
+            j["presses"].push_back(o);
+        }
+        return j;
+    }
+
+    Gen2::Rtc rtcFromJson(const json &r)
+    {
+        return { r[0].get<int>(), r[1].get<int>(), r[2].get<int>(), r[3].get<int>(), r[4].get<int>() };
+    }
+
+    Gen2::RomPtr langRom(const std::string &lang)
+    {
+        return rom(golden("gen2_core.json")["roms"][lang].get<std::string>());
+    }
+
+    std::optional<Bytes> namedSave(const std::string &name)
+    {
+        return save(golden("gen2_core.json")["saves"][name].get<std::string>());
+    }
 }

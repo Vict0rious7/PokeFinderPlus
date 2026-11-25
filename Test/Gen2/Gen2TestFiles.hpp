@@ -11,6 +11,7 @@
 #ifndef GEN2TESTFILES_HPP
 #define GEN2TESTFILES_HPP
 
+#include <Core/Gen2/CelebiPlan.hpp>
 #include <Core/Gen2/CrystalSave.hpp>
 #include <Test/Data.hpp>
 #include <cstdint>
@@ -45,6 +46,16 @@ namespace Gen2Test
     /// Minimal values from the prototype's read_minimal / apply_minimal dict.
     Gen2::Minimal minimalFromJson(const json &m);
     json minimalToJson(const Gen2::Minimal &m);
+
+    /// Plan from the prototype's plan json (discover output).
+    Gen2::Plan planFromJson(const json &p);
+    json planToJson(const Gen2::Plan &p);
+    Gen2::Rtc rtcFromJson(const json &r);
+
+    /// The VC ROM of a language (hash from golden2/core.json); null when missing.
+    Gen2::RomPtr langRom(const std::string &lang);
+    /// Victor's save / the EN test save (hash from golden2/core.json); empty when missing.
+    std::optional<Bytes> namedSave(const std::string &name);
 }
 
 #endif // GEN2TESTFILES_HPP
