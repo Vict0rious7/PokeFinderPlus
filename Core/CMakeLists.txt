@@ -72,6 +72,8 @@ add_library(PokeFinderCore STATIC
     Gen2/CelebiPlan.hpp
     Gen2/CelebiSearch.cpp
     Gen2/CelebiSearch.hpp
+    Gen2/CelebiSwitchRule.cpp
+    Gen2/CelebiSwitchRule.hpp
     Gen2/CrystalSave.cpp
     Gen2/CrystalSave.hpp
     Gen2/VcCore.cpp

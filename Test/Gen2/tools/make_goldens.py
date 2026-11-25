@@ -259,7 +259,86 @@ def sec_cal():
     dump('cal.json', dict(cases=cases, band=band))
 
 
-SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search, cal=sec_cal)
+BLOCKS = [('b1', 'fr', ('runs/fg3_fr', 'runs/fgx_fr')), ('b2', 'fr', ('runs/fg3_fr', 'runs/fgx_fr')),
+          ('b2x', 'fr', ('runs/fg3_fr', 'runs/fgx_fr')), ('b3', 'fr', ('runs/fg3_fr', 'runs/fgx_fr')),
+          ('b3c', 'fr', ('runs/fg3_fr', 'runs/fgx_fr')), ('b4', 'fr', ('runs/fg3_fr', 'runs/fgx_fr')),
+          ('b4b', 'fr_k2', ('runs/t25/fgk2_fr',)), ('b5', 'en_test', ('runs/t25/fgx3_np',))]
+
+
+def sec_switch():
+    """Step 6: the switch rule (joint model over timer residual x F, v0.5/v0.6) at every advice step of the harness blocks
+    (68 steps; the logged CLI line is checked against the recompute), and the retail check (realcheck.py: P(r) of Victor's
+    13 calibration attempts). Grids stored filtered: the leaves whose DV is a candidate of one of the block's attempts."""
+    import numpy as np
+    em = ct.err_model(.5, 3, .05)
+    out = dict(blocks=[], grids={}, em=em)
+    allc = {}
+    for tag, fsset, gdirs in BLOCKS:
+        hunt = json.load(open(os.path.join(WS, 'runs/t25/h_%s/hunt.json' % tag)))
+        allc.setdefault('+'.join(gdirs), set()).update(c for x in hunt for c in ct.dv_cands(tuple(x['stats'])))
+    for tag, fsset, gdirs in BLOCKS:
+        G = {}
+        for d in gdirs:
+            G.update(ct.load_jobs(os.path.join(WS, d)))
+        p1, p2 = ct.pick(ct.all_hits(os.path.join(WS, FS_DIRS[fsset])))
+        S1, S2 = set(p1['F_ok']), set(p2['F_ok'])
+        hunt = json.load(open(os.path.join(WS, 'runs/t25/h_%s/hunt.json' % tag)))
+        cands = sorted({c for x in hunt for c in ct.dv_cands(tuple(x['stats']))})
+        gkey = '+'.join(gdirs)
+        if gkey not in out['grids']:
+            cs = allc[gkey]
+            leaves = []
+            for name in sorted(G):
+                parts = name.split('_')
+                i, F = int(parts[1]), int(parts[2]); X = int(parts[3][1:]) if len(parts) > 3 else 0
+                for key, dv in G[name].items():
+                    if dv in cs:
+                        leaves.append([i, F, X] + list(map(int, key.split(','))) + [dv])
+            out['grids'][gkey] = dict(n_leaves=len(G['f_0_00']), leaves=leaves, cands=sorted(cs))
+        LIK = ct.joint_model(G, em)
+        steps = []
+        for line in open(os.path.join(WS, 'runs/t25/h_%s/log.jsonl' % tag)):
+            e = json.loads(line)
+            if e.get('event') != 'advice':
+                continue
+            n = e['n']
+            obs = [(x['plan'] - 1, ct.dv_cands(tuple(x['stats'])), int(x.get('timer_moved', 0))) for x in hunt[:n]]
+            post, mis = ct.joint_posterior(LIK, obs)
+            on, c = obs[-1][0], obs[-1][2]
+            recal = sum(mis[-3:]) >= ct.MISFIT
+            r1, r2, adv, move, pr = ct.joint_advise(post, S1, S2, on, c, 0.1)
+            cli = ('RECALIBRATE' if recal else 'P(F in plan 1 set) %.2f   P(F in plan 2 set) %.2f   -> %s' % (r1, r2, adv))
+            assert (recal and 'RECALIBRATE' in e['cli_all']) or cli in e['cli_all'].splitlines(), (tag, n, e['cli_all'], cli)
+            assert (move != 0) == ('MOVE YOUR TIMER' in e['cli_all']), (tag, n, e['cli_all'], move)
+            steps.append(dict(n=n, recalibrate=recal, misfit=mis, p1=float(r1), p2=float(r2), advice=adv, move=int(move),
+                              pr=[float(x) for x in post.sum(1)], cli=e['cli'], cli_all=e['cli_all']))
+        out['blocks'].append(dict(tag=tag, fs=fsset, grids=gkey, S1=sorted(S1), S2=sorted(S2),
+                                  hunt=[dict(plan=x['plan'], stats=x['stats'], timer_moved=x.get('timer_moved', 0)) for x in hunt], steps=steps))
+    # realcheck.py (retail calibrations vs the joint model, Kenji 1)
+    rc = []
+    for name, gdir, attf, Xh, ks, h in (('cal1', 'runs/t22/t3/g23', 'runs/t22/t3/cal1.json', -21, (0, 1), 23),
+                                        ('cal2', 'runs/t22/t3/g18', 'runs/t22/t3/cal2.json', -1, (0,), 18)):
+        G = ct.load_jobs(os.path.join(WS, gdir)); A = json.load(open(os.path.join(WS, attf)))
+        post = np.array([ct.R_PRIOR[r] for r in ct.RS]); rows = []
+        for a in A:
+            cands = ct.dv_cands(tuple(a['stats'])); L = np.zeros(5)
+            for j, r in enumerate(ct.RS):
+                for dl, w in ct.INFO_MODEL.items():
+                    es = ct._shift_em(em, dl); X = Xh + r + dl; best = 0
+                    for k in ks:
+                        g = G.get('g_1_%d_%02d_%+03d' % (k, h, X), {}); p = 0
+                        for key, dv in g.items():
+                            if dv in cands:
+                                e = list(map(int, key.split(',')))[1:]; p += es.get(e[0], 0) * es.get(e[1], 0) * es.get(e[2], 0)
+                        best = max(best, p)
+                    L[j] += w * best
+            rows.append(bool(L.sum() > 0)); post = post * (L + 1e-4 / 65536); post /= post.sum()
+        rc.append(dict(name=name, Xh=Xh, ks=list(ks), hour=h, fit=rows, pr=[float(x) for x in post]))
+    out['realcheck'] = rc
+    dump('switch.json', out)
+
+
+SECTIONS = dict(core=sec_core, save=sec_save, plan=sec_plan, search=sec_search, cal=sec_cal, switch=sec_switch)
 if __name__ == '__main__':
     for s in sys.argv[1:] or SECTIONS:
         SECTIONS[s]()
